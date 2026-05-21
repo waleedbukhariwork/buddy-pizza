@@ -132,4 +132,14 @@ export const Icons = {
 			<path d='M4 12l5 5L20 6' />
 		</Icon>
 	),
+	minus: (
+		<Icon>
+			<path d='M5 12h14' />
+		</Icon>
+	),
+	x: (
+		<Icon>
+			<path d='M6 6l12 12M18 6L6 18' />
+		</Icon>
+	),
 }

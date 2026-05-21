@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/v1/auth")
-@CrossOrigin(origins = "*")
 public class AuthController {
     
     @Autowired

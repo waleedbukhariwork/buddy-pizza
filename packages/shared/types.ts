@@ -38,6 +38,7 @@ export interface Deal {
 	originalPrice: number
 	discountPrice: number
 	badge: string
+	items?: string | null
 	isActive: boolean
 }
 
@@ -90,6 +91,7 @@ export interface DashboardMetrics {
 
 export interface CartItem {
 	productId: number
+	dealId?: number
 	productName: string
 	price: number
 	quantity: number

@@ -7,10 +7,12 @@ export function AdminTopbar({
 	title,
 	sub,
 	cta,
+	onCta,
 }: {
 	title: string
 	sub: string
 	cta?: string
+	onCta?: () => void
 }) {
 	return (
 		<div
@@ -75,7 +77,7 @@ export function AdminTopbar({
 						}}
 					/>
 				</button>
-				<button className='bf-btn bf-btn-primary bf-btn-md'>
+				<button className='bf-btn bf-btn-primary bf-btn-md' onClick={onCta}>
 					{Icons.plus} {cta || 'New item'}
 				</button>
 			</div>

@@ -4,7 +4,9 @@ import com.buddyfeast.dto.DealDTO;
 import com.buddyfeast.entity.Deal;
 import com.buddyfeast.repository.DealRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,13 +37,15 @@ public class DealService {
     }
     
     public Deal createDeal(Deal deal) {
+        validatePricing(deal);
         return dealRepository.save(deal);
     }
-    
+
     public Deal updateDeal(Long id, Deal dealDetails) {
+        validatePricing(dealDetails);
         Deal deal = dealRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Deal not found"));
-        
+
         deal.setTitle(dealDetails.getTitle());
         deal.setDescription(dealDetails.getDescription());
         deal.setTag(dealDetails.getTag());
@@ -50,8 +54,21 @@ public class DealService {
         deal.setBadge(dealDetails.getBadge());
         deal.setItems(dealDetails.getItems());
         deal.setIsActive(dealDetails.getIsActive());
-        
+        deal.setIsFeatured(dealDetails.getIsFeatured());
+
         return dealRepository.save(deal);
+    }
+
+    private void validatePricing(Deal deal) {
+        if (deal.getTitle() == null || deal.getTitle().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Deal title is required");
+        }
+        if (deal.getOriginalPrice() != null && deal.getDiscountPrice() != null
+                && deal.getDiscountPrice() > deal.getOriginalPrice()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Deal price (Rs." + deal.getDiscountPrice().intValue() +
+                ") cannot be greater than original price (Rs." + deal.getOriginalPrice().intValue() + ")");
+        }
     }
     
     public void deleteDeal(Long id) {
@@ -67,7 +84,9 @@ public class DealService {
             .originalPrice(deal.getOriginalPrice())
             .discountPrice(deal.getDiscountPrice())
             .badge(deal.getBadge())
+            .items(deal.getItems())
             .isActive(deal.getIsActive())
+            .isFeatured(deal.getIsFeatured())
             .build();
     }
 }

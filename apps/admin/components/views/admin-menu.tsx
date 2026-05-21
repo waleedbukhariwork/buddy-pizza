@@ -249,6 +249,7 @@ export function AdminMenu() {
 								<button
 									key={c}
 									onClick={() => setSelectedCat(c)}
+									className={`bf-sidebar-item${activeCat === c ? ' bf-sidebar-item--active' : ''}`}
 									style={{
 										display: 'flex',
 										justifyContent: 'space-between',
@@ -573,7 +574,7 @@ export function AdminMenu() {
 							}}
 						>
 							<div>
-								<label className='bf-label'>Name *</label>
+								<label className='bf-label'>Name <span className='bf-req'>*</span></label>
 								<input
 									className='bf-input'
 									value={form.name}
@@ -584,7 +585,7 @@ export function AdminMenu() {
 								/>
 							</div>
 							<div>
-								<label className='bf-label'>Category *</label>
+								<label className='bf-label'>Category <span className='bf-req'>*</span></label>
 								<select
 									className='bf-input'
 									value={form.categoryId ?? ''}
@@ -621,7 +622,7 @@ export function AdminMenu() {
 							</div>
 							{!form.hasSizes ? (
 								<div>
-									<label className='bf-label'>Price (Rs.) *</label>
+									<label className='bf-label'>Price (Rs.) <span className='bf-req'>*</span></label>
 									<input
 										className='bf-input'
 										type='number'
@@ -639,7 +640,7 @@ export function AdminMenu() {
 							) : (
 								<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 									<label className='bf-label'>
-										Size Prices (Rs.) *
+										Size Prices (Rs.) <span className='bf-req'>*</span>
 										<span style={{ fontWeight: 400, color: 'var(--bf-mute)', marginLeft: 6 }}>
 											{form.priceLarge ? 'S / M / L' : 'Half / Full'}
 										</span>
@@ -702,7 +703,7 @@ export function AdminMenu() {
 								</div>
 							)}
 							<div>
-								<label className='bf-label'>Description</label>
+								<label className='bf-label'>Description <span className='bf-opt'>(optional)</span></label>
 								<textarea
 									className='bf-input'
 									rows={2}
@@ -737,6 +738,7 @@ export function AdminMenu() {
 										onClick={() =>
 											setForm((f) => ({ ...f, [key]: !f[key] }))
 										}
+										className='bf-toggle-btn'
 										style={{
 											padding: '8px 6px',
 											borderRadius: 10,
@@ -836,7 +838,7 @@ export function AdminMenu() {
 							Create a category and select it for this item.
 						</p>
 						<div style={{ marginBottom: 14 }}>
-							<label className='bf-label'>Category name *</label>
+							<label className='bf-label'>Category name <span className='bf-req'>*</span></label>
 							<input
 								className='bf-input'
 								value={newCategoryName}

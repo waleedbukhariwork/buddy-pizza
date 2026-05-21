@@ -1,11 +1,15 @@
 package com.buddyfeast.service;
 
+import com.buddyfeast.dto.PageResponse;
 import com.buddyfeast.dto.ProductDTO;
 import com.buddyfeast.entity.Category;
 import com.buddyfeast.entity.Product;
 import com.buddyfeast.repository.CategoryRepository;
 import com.buddyfeast.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,7 +35,21 @@ public class ProductService {
             .map(this::convertToDTO)
             .orElseThrow(() -> new RuntimeException("Product not found"));
     }
-    
+
+    private static final int MAX_PAGE_SIZE = 50;
+    private static final int MAX_QUERY_LENGTH = 200;
+
+    public PageResponse<ProductDTO> searchProducts(String q, Long categoryId, int page, int size) {
+        String safeQ = (q == null ? "" : q).strip();
+        if (safeQ.length() > MAX_QUERY_LENGTH) safeQ = safeQ.substring(0, MAX_QUERY_LENGTH);
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        PageRequest pageable = PageRequest.of(page, safeSize, Sort.by("name").ascending());
+        Page<Product> results = categoryId != null
+                ? productRepository.searchAvailableByCategory(safeQ, categoryId, pageable)
+                : productRepository.searchAvailable(safeQ, pageable);
+        return PageResponse.of(results.map(this::convertToDTO));
+    }
+
     public Product createProduct(ProductDTO productDetails) {
         Product product = Product.builder()
             .name(productDetails.getName())

@@ -1,5 +1,6 @@
 import useSWR from 'swr'
 import { apiClient } from './api-client'
+import type { User } from '@shared/index'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface Product {
@@ -34,6 +35,7 @@ export interface Deal {
 	originalPrice?: number | null
 	discountPrice?: number | null
 	badge?: string | null
+	items?: string | null
 	isActive: boolean
 }
 
@@ -60,9 +62,26 @@ async function fetcher<T>(url: string): Promise<T> {
 	return data
 }
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+export interface PageResponse<T> {
+	content: T[]
+	page: number
+	size: number
+	totalElements: number
+	totalPages: number
+	last: boolean
+}
+
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 export function useProducts() {
 	return useSWR<Product[]>('/v1/products', fetcher)
+}
+
+export function useProductSearch(q: string, categoryId: number | null, page: number, size = 12) {
+	const params = new URLSearchParams({ q, page: String(page), size: String(size) })
+	if (categoryId !== null) params.set('categoryId', String(categoryId))
+	const key = q.trim().length > 0 ? `/v1/products/search?${params}` : null
+	return useSWR<PageResponse<Product>>(key, fetcher)
 }
 
 export function useCategories() {
@@ -75,6 +94,41 @@ export function useDeals() {
 
 export function useMyOrders() {
 	return useSWR<Order[]>('/v1/orders', fetcher)
+}
+
+export function useMyProfile(enabled = true) {
+	return useSWR<User>(enabled ? '/v1/users/me' : null, fetcher)
+}
+
+// ─── Profile mutations ────────────────────────────────────────────────────────
+export async function updateProfile(data: { name?: string; email?: string; address?: string }): Promise<User> {
+	const res = await apiClient.put<User>('/v1/users/me', data)
+	return res.data
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+	await apiClient.put('/v1/users/me/password', { currentPassword, newPassword })
+}
+
+// ─── Order placement ──────────────────────────────────────────────────────────
+export interface PlacedOrder {
+	id: number
+	orderNumber: string
+	total: number
+	status: string
+	deliveryAddress: string
+	createdAt: string
+	items: Array<{ productName: string; quantity: number; price: number }>
+}
+
+export async function placeOrder(payload: {
+	items: Array<{ productId: number; quantity: number; customizations?: string }>
+	deliveryAddress: string
+	customerPhone: string
+	specialNotes?: string
+}): Promise<PlacedOrder> {
+	const { data } = await apiClient.post<PlacedOrder>('/v1/orders', payload)
+	return data
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

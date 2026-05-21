@@ -11,7 +11,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/assets")
-@CrossOrigin(origins = "*")
 public class UploadController {
 
     @Autowired

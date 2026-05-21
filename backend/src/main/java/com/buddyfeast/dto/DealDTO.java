@@ -17,4 +17,5 @@ public class DealDTO {
     private String badge;
     private String items;
     private Boolean isActive;
+    private Boolean isFeatured;
 }

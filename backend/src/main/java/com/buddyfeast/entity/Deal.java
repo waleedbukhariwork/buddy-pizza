@@ -25,8 +25,9 @@ public class Deal {
 
     @Column(columnDefinition = "TEXT")
     private String items;
-    
+
     private Boolean isActive = true;
+    private Boolean isFeatured = false;
     
     @ManyToOne
     @JoinColumn(name = "restaurant_id")

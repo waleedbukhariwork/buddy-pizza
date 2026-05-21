@@ -72,5 +72,7 @@ export interface Deal {
 	originalPrice?: number | null
 	discountPrice?: number | null
 	badge?: string | null
+	items?: string | null
 	isActive: boolean
+	isFeatured?: boolean | null
 }

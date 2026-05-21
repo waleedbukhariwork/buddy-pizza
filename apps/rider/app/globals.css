@@ -61,3 +61,38 @@ a { color: inherit; text-decoration: none; }
 
 .bf-scroll::-webkit-scrollbar { display: none; }
 .bf-scroll { scrollbar-width: none; }
+
+/* ─── Button hover system ─────────────────────────────────────────────────────── */
+.bf-btn { transition: transform .12s ease, background .15s, box-shadow .15s, color .15s; }
+
+.bf-btn-primary:hover {
+	background: #f04a22;
+	transform: translateY(-1.5px);
+	box-shadow: 0 4px 0 var(--bf-ember-d), 0 14px 26px rgba(232, 67, 31, 0.48);
+}
+
+.bf-btn-outline:hover {
+	box-shadow: inset 0 0 0 1.5px var(--bf-ink);
+	transform: translateY(-1px);
+	background: var(--bf-cream);
+}
+
+.bf-btn-ghost:hover { background: rgba(0, 0, 0, 0.07); }
+
+.bf-btn-ghost.bf-btn-icon:hover {
+	transform: scale(1.08);
+	background: rgba(0, 0, 0, 0.07);
+}
+
+.bf-btn-ink:hover {
+	background: #3d3839;
+	transform: translateY(-1.5px);
+	box-shadow: 0 4px 0 rgba(35, 31, 32, 0.35), 0 10px 20px rgba(35, 31, 32, 0.22);
+}
+
+.bf-btn:disabled,
+.bf-btn[disabled] {
+	opacity: 0.55;
+	cursor: not-allowed;
+	pointer-events: none;
+}

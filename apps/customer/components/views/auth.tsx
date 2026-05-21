@@ -255,6 +255,15 @@ function AuthSignIn() {
 	const [remember, setRemember] = useState(false)
 	const [isLoading, setIsLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [fieldError, setFieldError] = useState<string | null>(null)
+
+	function validateIdentifier() {
+		if (!phoneOrEmail.trim()) {
+			setFieldError('Please enter your phone or email')
+		} else {
+			setFieldError(null)
+		}
+	}
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault()
@@ -442,13 +451,19 @@ function AuthSignIn() {
 								</span>
 								<input
 									className='bf-input'
-									style={{ paddingLeft: 40 }}
+									style={{ paddingLeft: 40, borderColor: fieldError ? 'var(--bf-error)' : undefined }}
 									placeholder='923000000000'
 									value={phoneOrEmail}
-									onChange={(e) => setPhoneOrEmail(e.target.value)}
+									onChange={(e) => { setPhoneOrEmail(e.target.value); setFieldError(null) }}
+									onBlur={validateIdentifier}
 									required
 									autoComplete='username'
 								/>
+								{fieldError && (
+									<div style={{ marginTop: 5, fontSize: 12, color: 'var(--bf-error)', fontWeight: 600 }}>
+										{fieldError}
+									</div>
+								)}
 							</div>
 						</div>
 						<div>
@@ -579,9 +594,9 @@ function AuthSignIn() {
 								style={{
 									padding: '10px 14px',
 									borderRadius: 10,
-									background: 'rgba(232,67,31,.08)',
-									border: '1px solid rgba(232,67,31,.2)',
-									color: 'var(--bf-ember)',
+									background: 'rgba(239,68,68,.08)',
+									border: '1px solid rgba(239,68,68,.2)',
+									color: 'var(--bf-error)',
 									fontSize: 13,
 									fontWeight: 600,
 								}}
@@ -639,19 +654,16 @@ function AuthSignIn() {
 								style={{ flex: 1, height: 1, background: 'var(--bf-line)' }}
 							/>
 						</div>
-						<p
-							style={{
-								textAlign: 'center',
-								fontSize: 13.5,
-								color: 'var(--bf-ink-2)',
-							}}
-						>
+						<p style={{ textAlign: 'center', fontSize: 13.5, color: 'var(--bf-ink-2)' }}>
 							New to Buddy Feast?{' '}
-							<Link
-								href='/auth/register'
-								style={{ fontWeight: 700, color: 'var(--bf-ember)' }}
-							>
+							<Link href='/auth/register' style={{ fontWeight: 700, color: 'var(--bf-ember)' }}>
 								Create your account →
+							</Link>
+						</p>
+						<p style={{ textAlign: 'center', fontSize: 13, color: 'var(--bf-mute)' }}>
+							or{' '}
+							<Link href='/' style={{ fontWeight: 600, color: 'var(--bf-ink-2)', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+								Continue as guest
 							</Link>
 						</p>
 					</div>
@@ -1122,9 +1134,9 @@ function AuthSignUp() {
 									gridColumn: '1 / -1',
 									padding: '10px 14px',
 									borderRadius: 10,
-									background: 'rgba(232,67,31,.08)',
-									border: '1px solid rgba(232,67,31,.2)',
-									color: 'var(--bf-ember)',
+									background: 'rgba(239,68,68,.08)',
+									border: '1px solid rgba(239,68,68,.2)',
+									color: 'var(--bf-error)',
 									fontSize: 13,
 									fontWeight: 600,
 								}}

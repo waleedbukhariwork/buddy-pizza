@@ -9,7 +9,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/v1/deals")
-@CrossOrigin(origins = "*")
 public class DealController {
     
     @Autowired

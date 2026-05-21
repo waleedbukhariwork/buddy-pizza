@@ -65,6 +65,8 @@ a { color: inherit; text-decoration: none; }
 .bf-input { font-family: var(--bf-font); font-size: 14px; background: var(--bf-paper); color: var(--bf-ink); border: 1px solid var(--bf-line-2); border-radius: 12px; padding: 12px 14px; outline: none; width: 100%; transition: border-color .15s, box-shadow .15s; }
 .bf-input:focus { border-color: var(--bf-ink); box-shadow: 0 0 0 3px rgba(35,31,32,.08); }
 .bf-label { font-size: 11.5px; font-weight: 600; color: var(--bf-ink-2); margin-bottom: 6px; letter-spacing: -0.01em; display: block; }
+.bf-req { color: #E8431F; margin-left: 2px; font-weight: 700; }
+.bf-opt { color: var(--bf-mute); font-weight: 400; margin-left: 4px; font-size: 10.5px; }
 
 .bf-eyebrow { font-family: var(--bf-mono); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; font-size: 11px; color: var(--bf-ink-2); }
 .bf-mono { font-family: var(--bf-mono); }
@@ -86,3 +88,69 @@ a { color: inherit; text-decoration: none; }
 
 .bf-scroll::-webkit-scrollbar { display: none; }
 .bf-scroll { scrollbar-width: none; }
+
+/* ─── Button hover system ─────────────────────────────────────────────────────── */
+.bf-btn { transition: transform .12s ease, background .15s, box-shadow .15s, color .15s; }
+
+.bf-btn-primary:hover {
+	background: #f04a22;
+	transform: translateY(-1.5px);
+	box-shadow: 0 4px 0 var(--bf-ember-d), 0 14px 26px rgba(232, 67, 31, 0.48);
+}
+
+.bf-btn-outline:hover {
+	box-shadow: inset 0 0 0 1.5px var(--bf-ink);
+	transform: translateY(-1px);
+	background: var(--bf-cream);
+}
+
+.bf-btn-ghost:hover { background: rgba(0, 0, 0, 0.07); }
+
+.bf-btn-ghost.bf-btn-icon:hover {
+	transform: scale(1.08);
+	background: rgba(0, 0, 0, 0.07);
+}
+
+.bf-btn-amber:hover {
+	background: var(--bf-amber-d);
+	transform: translateY(-1.5px);
+	box-shadow: 0 4px 0 #c88800, 0 12px 24px rgba(255, 182, 39, 0.42);
+}
+
+.bf-btn-ink:hover {
+	background: #3d3839;
+	transform: translateY(-1.5px);
+	box-shadow: 0 4px 0 rgba(35, 31, 32, 0.35), 0 10px 20px rgba(35, 31, 32, 0.22);
+}
+
+.bf-btn:disabled,
+.bf-btn[disabled] {
+	opacity: 0.55;
+	cursor: not-allowed;
+	pointer-events: none;
+}
+
+/* ─── Admin sidebar item hover ───────────────────────────────────────────────── */
+.bf-sidebar-item {
+	transition: background 0.14s, color 0.14s, transform 0.1s;
+}
+
+.bf-sidebar-item:hover {
+	background: var(--bf-cream) !important;
+	color: var(--bf-ink) !important;
+}
+
+.bf-sidebar-item.bf-sidebar-item--active:hover {
+	background: var(--bf-cream-2) !important;
+}
+
+/* ─── Admin toggle button hover (Available / Hot / Sizes) ────────────────────── */
+.bf-toggle-btn {
+	transition: border-color 0.14s, background 0.14s, color 0.14s, transform 0.1s, box-shadow 0.14s;
+}
+
+.bf-toggle-btn:hover {
+	border-color: var(--bf-ink) !important;
+	transform: translateY(-1px);
+	box-shadow: var(--bf-shadow-sm);
+}
