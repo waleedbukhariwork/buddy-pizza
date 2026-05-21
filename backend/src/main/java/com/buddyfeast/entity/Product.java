@@ -24,6 +24,12 @@ public class Product {
     @JoinColumn(name = "category_id")
     private Category category;
     
+    private String imageUrl;
+
+    private Double priceSmall;
+    private Double priceMedium;
+    private Double priceLarge;
+
     private Boolean isAvailable = true;
     private Boolean isHot = false;
     private Boolean hasSizes = false;

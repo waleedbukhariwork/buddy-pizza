@@ -15,5 +15,6 @@ public class DealDTO {
     private Double originalPrice;
     private Double discountPrice;
     private String badge;
+    private String items;
     private Boolean isActive;
 }

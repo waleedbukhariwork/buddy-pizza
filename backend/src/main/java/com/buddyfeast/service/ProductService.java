@@ -37,6 +37,10 @@ public class ProductService {
             .name(productDetails.getName())
             .description(productDetails.getDescription())
             .price(productDetails.getPrice())
+            .imageUrl(productDetails.getImageUrl())
+            .priceSmall(productDetails.getPriceSmall())
+            .priceMedium(productDetails.getPriceMedium())
+            .priceLarge(productDetails.getPriceLarge())
             .category(resolveCategory(productDetails))
             .isAvailable(productDetails.getIsAvailable() != null ? productDetails.getIsAvailable() : true)
             .isHot(productDetails.getIsHot() != null ? productDetails.getIsHot() : false)
@@ -53,6 +57,10 @@ public class ProductService {
         product.setName(productDetails.getName());
         product.setDescription(productDetails.getDescription());
         product.setPrice(productDetails.getPrice());
+        product.setImageUrl(productDetails.getImageUrl());
+        product.setPriceSmall(productDetails.getPriceSmall());
+        product.setPriceMedium(productDetails.getPriceMedium());
+        product.setPriceLarge(productDetails.getPriceLarge());
         product.setIsAvailable(productDetails.getIsAvailable());
         product.setIsHot(productDetails.getIsHot());
         product.setHasSizes(productDetails.getHasSizes());
@@ -71,6 +79,10 @@ public class ProductService {
             .name(product.getName())
             .description(product.getDescription())
             .price(product.getPrice())
+            .imageUrl(product.getImageUrl())
+            .priceSmall(product.getPriceSmall())
+            .priceMedium(product.getPriceMedium())
+            .priceLarge(product.getPriceLarge())
             .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
             .category(product.getCategory() != null ? product.getCategory().getName() : "")
             .isAvailable(product.getIsAvailable())

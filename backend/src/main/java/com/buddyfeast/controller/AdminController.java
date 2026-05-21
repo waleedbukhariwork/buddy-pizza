@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping({"/admin", "/api/admin"})
+@RequestMapping("/v1/admin")
 @CrossOrigin(origins = "*")
 public class AdminController {
     

@@ -48,6 +48,7 @@ public class DealService {
         deal.setOriginalPrice(dealDetails.getOriginalPrice());
         deal.setDiscountPrice(dealDetails.getDiscountPrice());
         deal.setBadge(dealDetails.getBadge());
+        deal.setItems(dealDetails.getItems());
         deal.setIsActive(dealDetails.getIsActive());
         
         return dealRepository.save(deal);

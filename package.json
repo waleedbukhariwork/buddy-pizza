@@ -1,0 +1,22 @@
+{
+	"name": "buddy-feast-monorepo",
+	"version": "1.0.0",
+	"description": "Buddy Feast - Complete restaurant ordering platform",
+	"private": true,
+	"workspaces": [
+		"apps/customer",
+		"apps/admin",
+		"apps/rider",
+		"packages/shared"
+	],
+	"scripts": {
+		"dev": "turbo run dev --parallel",
+		"build": "turbo run build",
+		"test": "turbo run test",
+		"lint": "turbo run lint",
+		"clean": "turbo run clean && rm -rf node_modules"
+	},
+	"devDependencies": {
+		"turbo": "^1.10.0"
+	}
+}

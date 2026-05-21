@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping({"/deals", "/api/deals"})
+@RequestMapping("/v1/deals")
 @CrossOrigin(origins = "*")
 public class DealController {
     

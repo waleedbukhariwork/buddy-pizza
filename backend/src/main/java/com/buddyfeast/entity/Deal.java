@@ -22,6 +22,9 @@ public class Deal {
     private Double originalPrice;
     private Double discountPrice;
     private String badge;
+
+    @Column(columnDefinition = "TEXT")
+    private String items;
     
     private Boolean isActive = true;
     

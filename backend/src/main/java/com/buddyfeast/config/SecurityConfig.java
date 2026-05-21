@@ -30,11 +30,18 @@ public class SecurityConfig {
             .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             .and()
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/auth/**", "/api/auth/**").permitAll()
-                .requestMatchers("/products", "/products/**", "/deals", "/api/products", "/api/products/**", "/api/deals").permitAll()
-                .requestMatchers("/admin/**", "/api/admin/**").hasAuthority("ADMIN")
-                .requestMatchers("/rider/**", "/api/rider/**").hasAuthority("RIDER")
-                .requestMatchers("/orders/**", "/api/orders/**").hasAuthority("CUSTOMER")
+                // Public — no auth required
+                .requestMatchers("/v1/auth/**").permitAll()
+                .requestMatchers("/v1/products/**").permitAll()
+                .requestMatchers("/v1/deals/**").permitAll()
+                .requestMatchers("/v1/categories/**").permitAll()
+                // Admin only
+                .requestMatchers("/v1/admin/**").hasAuthority("ADMIN")
+                .requestMatchers("/v1/assets/**").hasAuthority("ADMIN")
+                // Rider only
+                .requestMatchers("/v1/rider/**").hasAuthority("RIDER")
+                // Customer only
+                .requestMatchers("/v1/orders/**").hasAuthority("CUSTOMER")
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
