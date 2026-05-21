@@ -22,6 +22,9 @@ public class User {
     private String password;
     private String address;
     private String city;
+
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean verified;
     
     @ManyToOne
     @JoinColumn(name = "restaurant_id")

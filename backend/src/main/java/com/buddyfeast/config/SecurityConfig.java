@@ -42,6 +42,7 @@ public class SecurityConfig {
                 .requestMatchers("/v1/rider/**").hasAuthority("RIDER")
                 // Customer only
                 .requestMatchers("/v1/orders/**").hasAuthority("CUSTOMER")
+                .requestMatchers("/v1/cart/**").hasAuthority("CUSTOMER")
                 .requestMatchers("/v1/users/**").hasAuthority("CUSTOMER")
                 .anyRequest().authenticated()
             )

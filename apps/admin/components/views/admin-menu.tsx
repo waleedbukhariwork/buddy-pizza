@@ -14,137 +14,528 @@ import {
 	createCategory,
 	rs,
 } from '../../lib/hooks'
-import type { Product } from '../../lib/types'
+import type { Product, Category } from '../../lib/types'
 
 const TONES: Tone[] = ['ember', 'amber', 'cream', 'ember', 'amber', 'cream']
 
-type ProductForm = Omit<Product, 'id'>
+// ─── Types ────────────────────────────────────────────────────────────────────
+type PricingMode = 'fixed' | 'sizes'
+type DiscountMode = 'none' | 'pct' | 'flat'
 
-type PanelState =
-	| { mode: 'closed' }
-	| { mode: 'add' }
-	| { mode: 'edit'; product: Product }
+interface ProductSize {
+	name: string
+	price: number | null
+}
+
+interface ProductForm {
+	name: string
+	description: string
+	categoryId: number | null
+	category: string
+	imageUrl: string | null
+	isAvailable: boolean
+	isHot: boolean
+	pricingMode: PricingMode
+	// Fixed
+	price: number
+	// Sizes (dynamic)
+	sizes: ProductSize[]
+	// Discount
+	discountMode: DiscountMode
+	discountPct: number | null
+	discountAmount: number | null
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function calcEffective(price: number, mode: DiscountMode, pct: number | null, amount: number | null): number {
+	if (mode === 'pct' && pct && pct > 0) return Math.max(0, Math.round(price * (1 - pct / 100)))
+	if (mode === 'flat' && amount && amount > 0) return Math.max(0, Math.round(price - amount))
+	return price
+}
+
+function discountModeFromProduct(p: Product): DiscountMode {
+	if (p.discountPct && p.discountPct > 0) return 'pct'
+	if (p.discountAmount && p.discountAmount > 0) return 'flat'
+	return 'none'
+}
+
+function parseSizesJson(p: Product): ProductSize[] {
+	if (p.sizesJson) {
+		try {
+			const parsed = JSON.parse(p.sizesJson) as ProductSize[]
+			if (Array.isArray(parsed) && parsed.length > 0) return parsed
+		} catch {
+			// fall through to legacy
+		}
+	}
+	// Legacy fallback
+	const sizes: ProductSize[] = []
+	if (p.priceSmall) sizes.push({ name: p.labelSmall ?? 'Small', price: p.priceSmall })
+	if (p.priceMedium) sizes.push({ name: p.labelMedium ?? 'Medium', price: p.priceMedium })
+	if (p.priceLarge) sizes.push({ name: p.labelLarge ?? 'Large', price: p.priceLarge })
+	return sizes.length > 0 ? sizes : [{ name: '', price: null }, { name: '', price: null }]
+}
+
+function formFromProduct(p: Product): ProductForm {
+	const dm = discountModeFromProduct(p)
+	return {
+		name: p.name,
+		description: p.description ?? '',
+		categoryId: p.categoryId ?? null,
+		category: p.category,
+		imageUrl: p.imageUrl ?? null,
+		isAvailable: p.isAvailable,
+		isHot: p.isHot ?? false,
+		pricingMode: p.hasSizes ? 'sizes' : 'fixed',
+		price: p.price,
+		sizes: p.hasSizes ? parseSizesJson(p) : [{ name: '', price: null }, { name: '', price: null }],
+		discountMode: dm,
+		discountPct: p.discountPct ?? null,
+		discountAmount: p.discountAmount ?? null,
+	}
+}
+
+function mapFormToPayload(form: ProductForm) {
+	const hasSizes = form.pricingMode === 'sizes'
+	const validSizes = hasSizes ? form.sizes.filter(s => s.price && s.price > 0) : []
+	const basePrice = hasSizes && validSizes.length > 0 ? (validSizes[0].price ?? 0) : form.price
+	return {
+		name: form.name.trim(),
+		description: form.description.trim() || null,
+		categoryId: form.categoryId,
+		category: form.category,
+		imageUrl: form.imageUrl,
+		isAvailable: form.isAvailable,
+		isHot: form.isHot,
+		hasSizes,
+		price: basePrice,
+		// Legacy size fields (first 3 for backward compat)
+		priceSmall: validSizes[0]?.price ?? null,
+		priceMedium: validSizes[1]?.price ?? null,
+		priceLarge: validSizes[2]?.price ?? null,
+		labelSmall: validSizes[0]?.name?.trim() || null,
+		labelMedium: validSizes[1]?.name?.trim() || null,
+		labelLarge: validSizes[2]?.name?.trim() || null,
+		// Full sizes list as JSON
+		sizesJson: hasSizes && validSizes.length > 0 ? JSON.stringify(validSizes) : null,
+		discountPct: form.discountMode === 'pct' ? form.discountPct : null,
+		discountAmount: form.discountMode === 'flat' ? form.discountAmount : null,
+	}
+}
 
 const EMPTY_FORM: ProductForm = {
 	name: '',
 	description: '',
-	price: 0,
 	categoryId: null,
 	category: '',
 	imageUrl: null,
 	isAvailable: true,
 	isHot: false,
-	hasSizes: false,
-	priceSmall: null,
-	priceMedium: null,
-	priceLarge: null,
+	pricingMode: 'fixed',
+	price: 0,
+	sizes: [{ name: '', price: null }, { name: '', price: null }],
+	discountMode: 'none',
+	discountPct: null,
+	discountAmount: null,
 }
 
-// ─── MENU CATALOG ─────────────────────────────────────────────────────────────
-export function AdminMenu() {
-	const { data: products, isLoading, error, mutate } = useProducts()
-	const {
-		data: categoriesData,
-		isLoading: categoriesLoading,
-		mutate: refreshCategories,
-	} = useCategories()
-	const [selectedCat, setSelectedCat] = useState<string | null>(null)
-	const [panel, setPanel] = useState<PanelState>({ mode: 'closed' })
-	const [form, setForm] = useState<ProductForm>(EMPTY_FORM)
-	const [saving, setSaving] = useState(false)
-	const [deleteId, setDeleteId] = useState<number | null>(null)
-	const [deleting, setDeleting] = useState(false)
-	const [saveError, setSaveError] = useState<string | null>(null)
-	const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
-	const [newCategoryName, setNewCategoryName] = useState('')
-	const [creatingCategory, setCreatingCategory] = useState(false)
-	const [categoryError, setCategoryError] = useState<string | null>(null)
-
-	const categories = useMemo(() => {
-		return (categoriesData ?? [])
-			.filter((category) => category.isActive)
-			.slice()
-			.sort(
-				(a, b) =>
-					(a.displayOrder ?? 999) - (b.displayOrder ?? 999) ||
-					a.name.localeCompare(b.name),
-			)
-	}, [categoriesData])
-
-	const activeCat = selectedCat ?? categories[0]?.name ?? null
-
-	const filteredProducts = useMemo(
-		() => (products ?? []).filter((p) => p.category === activeCat),
-		[products, activeCat],
+// ─── Section label ────────────────────────────────────────────────────────────
+function SectionLabel({ num, title }: { num: number; title: string }) {
+	return (
+		<div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+			<div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--bf-ink)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+				<span style={{ font: '700 11px var(--bf-mono)', color: '#fff' }}>{num}</span>
+			</div>
+			<span style={{ font: '700 12px var(--bf-mono)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--bf-ink-2)' }}>{title}</span>
+		</div>
 	)
+}
 
-	function openAdd() {
-		const activeCategory = categories.find((category) => category.name === activeCat)
-		setForm({
-			...EMPTY_FORM,
-			categoryId: activeCategory?.id ?? null,
-			category: activeCategory?.name ?? '',
-		})
-		setSaveError(null)
-		setPanel({ mode: 'add' })
+// ─── Pricing mode card ────────────────────────────────────────────────────────
+function PriceModeCard({ active, icon, title, desc, onClick }: {
+	active: boolean; icon: React.ReactNode; title: string; desc: string; onClick: () => void
+}) {
+	return (
+		<button
+			onClick={onClick}
+			style={{
+				flex: 1, padding: '14px 16px', borderRadius: 14,
+				border: `2px solid ${active ? 'var(--bf-ink)' : 'var(--bf-line-2)'}`,
+				background: active ? 'var(--bf-ink)' : 'var(--bf-paper)',
+				cursor: 'pointer', textAlign: 'left', transition: 'all .15s',
+				display: 'flex', flexDirection: 'column', gap: 5,
+			}}
+		>
+			<div style={{ color: active ? '#fff' : 'var(--bf-ember)', fontSize: 18 }}>{icon}</div>
+			<div style={{ font: '700 13px var(--bf-font)', color: active ? '#fff' : 'var(--bf-ink)' }}>{title}</div>
+			<div style={{ fontSize: 11, color: active ? 'rgba(255,255,255,.6)' : 'var(--bf-mute)', lineHeight: 1.4 }}>{desc}</div>
+		</button>
+	)
+}
+
+// ─── Discount section ─────────────────────────────────────────────────────────
+function DiscountSection({ form, setForm, basePrice }: {
+	form: ProductForm
+	setForm: React.Dispatch<React.SetStateAction<ProductForm>>
+	basePrice: number
+}) {
+	const modes: { key: DiscountMode; label: string }[] = [
+		{ key: 'none', label: 'No discount' },
+		{ key: 'pct', label: '% off' },
+		{ key: 'flat', label: 'Rs. off' },
+	]
+	const effective = calcEffective(basePrice, form.discountMode, form.discountPct, form.discountAmount)
+	const hasSavings = form.discountMode !== 'none' && effective < basePrice && basePrice > 0
+
+	return (
+		<div style={{ marginTop: 16, background: 'var(--bf-cream-2)', borderRadius: 14, padding: '14px 16px' }}>
+			<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+				<span className='bf-eyebrow'>DISCOUNT</span>
+				<span style={{ fontSize: 10.5, color: 'var(--bf-mute)', fontWeight: 400 }}>Optional · applies to all sizes</span>
+			</div>
+
+			<div style={{ display: 'flex', gap: 6, marginBottom: form.discountMode !== 'none' ? 12 : 0 }}>
+				{modes.map(m => (
+					<button
+						key={m.key}
+						onClick={() => setForm(f => ({ ...f, discountMode: m.key, discountPct: null, discountAmount: null }))}
+						style={{
+							flex: 1, padding: '9px 6px', borderRadius: 10,
+							border: `1.5px solid ${form.discountMode === m.key ? 'var(--bf-ink)' : 'var(--bf-line-2)'}`,
+							background: form.discountMode === m.key ? 'var(--bf-ink)' : 'var(--bf-paper)',
+							color: form.discountMode === m.key ? '#fff' : 'var(--bf-ink-2)',
+							font: '600 11.5px var(--bf-font)', cursor: 'pointer', transition: 'all .15s',
+						}}
+					>
+						{m.label}
+					</button>
+				))}
+			</div>
+
+			{form.discountMode !== 'none' && (
+				<>
+					<div>
+						<label className='bf-label'>
+							{form.discountMode === 'pct' ? 'Percentage off (%)' : 'Amount off (Rs.)'}
+						</label>
+						<div style={{ position: 'relative' }}>
+							{form.discountMode === 'flat' && (
+								<span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 11.5, fontWeight: 700, color: 'var(--bf-mute)', pointerEvents: 'none' }}>Rs.</span>
+							)}
+							<input
+								className='bf-input bf-mono'
+								type='number'
+								min={0}
+								max={form.discountMode === 'pct' ? 100 : undefined}
+								value={(form.discountMode === 'pct' ? form.discountPct : form.discountAmount) ?? ''}
+								onChange={e => {
+									const val = parseFloat(e.target.value) || null
+									setForm(f => f.discountMode === 'pct'
+										? { ...f, discountPct: val }
+										: { ...f, discountAmount: val })
+								}}
+								placeholder={form.discountMode === 'pct' ? '20' : '100'}
+								style={{
+									paddingLeft: form.discountMode === 'flat' ? 36 : 14,
+									fontWeight: 700, fontSize: 15,
+								}}
+							/>
+							{form.discountMode === 'pct' && (
+								<span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, fontWeight: 800, color: 'var(--bf-ember)', pointerEvents: 'none' }}>%</span>
+							)}
+						</div>
+					</div>
+
+					{hasSavings ? (
+						<div style={{ marginTop: 10, padding: '11px 14px', borderRadius: 10, background: '#DCFCE7', border: '1px solid #86efac', display: 'flex', alignItems: 'center', gap: 8 }}>
+							<span style={{ fontSize: 16 }}>🎉</span>
+							<div>
+								<div style={{ font: '700 13px var(--bf-font)', color: '#15803d' }}>
+									Starting from <span style={{ fontFamily: 'var(--bf-mono)' }}>Rs.{effective.toLocaleString('en-PK')}</span>
+								</div>
+								<div style={{ fontSize: 11, color: '#166534', marginTop: 2 }}>
+									{form.discountMode === 'pct' && form.discountPct ? `${form.discountPct}% off all sizes` : `Rs.${form.discountAmount} off every size`}
+								</div>
+							</div>
+						</div>
+					) : basePrice > 0 ? (
+						<div style={{ marginTop: 10, padding: '9px 13px', borderRadius: 10, background: 'rgba(232,67,31,.08)', color: 'var(--bf-ember)', fontSize: 12, fontWeight: 600 }}>
+							Enter a {form.discountMode === 'pct' ? 'percentage' : 'amount'} to preview savings
+						</div>
+					) : null}
+				</>
+			)}
+		</div>
+	)
+}
+
+// ─── Dynamic size row ─────────────────────────────────────────────────────────
+function SizeRowItem({ idx, total, size, form, onChange, onRemove }: {
+	idx: number
+	total: number
+	size: ProductSize
+	form: ProductForm
+	onChange: (s: ProductSize) => void
+	onRemove: () => void
+}) {
+	const effective = calcEffective(size.price ?? 0, form.discountMode, form.discountPct, form.discountAmount)
+	const hasDiscount = form.discountMode !== 'none' && (size.price ?? 0) > 0 && effective < (size.price ?? 0)
+	const isRequired = idx < 2
+
+	return (
+		<div style={{
+			display: 'grid', gridTemplateColumns: '28px 1fr 130px 108px 28px',
+			gap: 10, alignItems: 'end', padding: '12px 16px',
+			borderBottom: idx < total - 1 ? '1px solid var(--bf-line)' : 'none',
+		}}>
+			{/* Index badge */}
+			<div style={{
+				width: 26, height: 26, borderRadius: 8,
+				background: 'var(--bf-cream-2)',
+				border: '1.5px solid var(--bf-line)',
+				display: 'grid', placeItems: 'center',
+				font: '700 11px var(--bf-mono)', color: 'var(--bf-mute)',
+			}}>
+				{idx + 1}
+			</div>
+
+			{/* Name input */}
+			<div>
+				{idx === 0 && (
+					<label className='bf-label' style={{ marginBottom: 4 }}>
+						Size name <span className='bf-req'>*</span>
+					</label>
+				)}
+				<input
+					className='bf-input'
+					value={size.name}
+					onChange={e => onChange({ ...size, name: e.target.value })}
+					placeholder={idx === 0 ? 'e.g. Small, Half, 9 inch…' : idx === 1 ? 'e.g. Medium, Full, 12 inch…' : 'e.g. Large, Jumbo, 18 inch…'}
+					style={{ fontSize: 13 }}
+				/>
+			</div>
+
+			{/* Price input */}
+			<div>
+				{idx === 0 && (
+					<label className='bf-label' style={{ marginBottom: 4 }}>
+						Price {isRequired && <span className='bf-req'>*</span>}
+					</label>
+				)}
+				<div style={{ position: 'relative' }}>
+					<span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10.5, fontWeight: 700, color: 'var(--bf-mute)', pointerEvents: 'none' }}>Rs.</span>
+					<input
+						className='bf-input bf-mono'
+						type='number'
+						min={0}
+						value={size.price ?? ''}
+						onChange={e => onChange({ ...size, price: parseFloat(e.target.value) || null })}
+						placeholder='500'
+						style={{ paddingLeft: 30, fontWeight: 700 }}
+					/>
+				</div>
+			</div>
+
+			{/* Final price */}
+			<div>
+				{idx === 0 && <label className='bf-label' style={{ marginBottom: 4 }}>Final price</label>}
+				<div style={{
+					height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+					background: hasDiscount ? '#DCFCE7' : 'var(--bf-cream-2)',
+					border: `1px solid ${hasDiscount ? '#86efac' : 'var(--bf-line)'}`,
+					transition: 'all .2s',
+				}}>
+					{size.price ? (
+						<div style={{ textAlign: 'center' }}>
+							{hasDiscount && (
+								<div className='bf-mono' style={{ fontSize: 9, color: 'var(--bf-mute)', textDecoration: 'line-through', lineHeight: 1 }}>
+									{size.price.toLocaleString('en-PK')}
+								</div>
+							)}
+							<span className='bf-mono' style={{ fontWeight: 800, fontSize: 12, color: hasDiscount ? '#15803d' : 'var(--bf-ink)' }}>
+								Rs.{effective.toLocaleString('en-PK')}
+							</span>
+						</div>
+					) : (
+						<span style={{ fontSize: 11, color: 'var(--bf-mute)' }}>—</span>
+					)}
+				</div>
+			</div>
+
+			{/* Remove button */}
+			<div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 8 }}>
+				{total > 2 && (
+					<button
+						onClick={onRemove}
+						style={{
+							width: 26, height: 26, borderRadius: 6, border: 'none',
+							background: 'rgba(232,67,31,.1)', color: 'var(--bf-ember)',
+							cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 12,
+							transition: 'background .15s',
+						}}
+						title='Remove size'
+					>
+						✕
+					</button>
+				)}
+			</div>
+		</div>
+	)
+}
+
+// ─── Live product preview ─────────────────────────────────────────────────────
+function ProductPreview({ form }: { form: ProductForm }) {
+	const name = form.name.trim() || 'Product name'
+	const cat = form.category || 'Category'
+	const hasSizes = form.pricingMode === 'sizes'
+	const effective = calcEffective(form.price, form.discountMode, form.discountPct, form.discountAmount)
+	const hasFixedDiscount = !hasSizes && form.discountMode !== 'none' && effective < form.price && form.price > 0
+	const validSizes = form.sizes.filter(s => s.price && s.price > 0)
+
+	return (
+		<div>
+			<div className='bf-eyebrow' style={{ marginBottom: 14 }}>CUSTOMER PREVIEW</div>
+			<div className='bf-card' style={{ padding: 0, overflow: 'hidden' }}>
+				<div style={{ height: 3, background: form.isAvailable ? 'var(--bf-leaf)' : 'var(--bf-line)' }} />
+				<FoodImg tone='ember' style={{ width: '100%', height: 110, borderRadius: 0, border: 0 }} />
+				<div style={{ padding: '12px 14px 14px' }}>
+					{/* Badges */}
+					<div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
+						{form.isHot && <span className='bf-pill bf-pill-ember' style={{ fontSize: 9.5 }}>🌶 HOT</span>}
+						{form.discountMode !== 'none' && (
+							<span style={{ fontSize: 9.5, fontWeight: 700, background: '#DCFCE7', color: '#15803d', padding: '3px 8px', borderRadius: 999 }}>
+								{form.discountMode === 'pct' && form.discountPct ? `${form.discountPct}% OFF` : ''}
+								{form.discountMode === 'flat' && form.discountAmount ? `Rs.${form.discountAmount} OFF` : ''}
+							</span>
+						)}
+						{!form.isAvailable && <span className='bf-pill' style={{ fontSize: 9.5, opacity: 0.6 }}>UNAVAILABLE</span>}
+					</div>
+
+					<div style={{ font: '700 13px var(--bf-font)', lineHeight: 1.3, marginBottom: 3 }}>{name}</div>
+					<div style={{ fontSize: 10.5, color: 'var(--bf-mute)', marginBottom: 10 }}>{cat}</div>
+
+					{hasSizes ? (
+						validSizes.length > 0 ? (
+							<div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+								{validSizes.map((s, i) => {
+									const eff = calcEffective(s.price ?? 0, form.discountMode, form.discountPct, form.discountAmount)
+									const hasDis = form.discountMode !== 'none' && eff < (s.price ?? 0)
+									return (
+										<div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', background: 'var(--bf-cream-2)', borderRadius: 8 }}>
+											<span style={{ fontSize: 10.5, fontWeight: 600 }}>{s.name || `Size ${i + 1}`}</span>
+											<div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+												{hasDis && <span className='bf-mono' style={{ fontSize: 9, color: 'var(--bf-mute)', textDecoration: 'line-through' }}>Rs.{(s.price ?? 0).toLocaleString('en-PK')}</span>}
+												<span className='bf-mono' style={{ fontWeight: 800, fontSize: 11.5, color: 'var(--bf-ember)' }}>Rs.{eff.toLocaleString('en-PK')}</span>
+											</div>
+										</div>
+									)
+								})}
+							</div>
+						) : (
+							<div style={{ fontSize: 11, color: 'var(--bf-mute)', fontStyle: 'italic' }}>Enter size prices above</div>
+						)
+					) : (
+						<div style={{ display: 'flex', alignItems: 'flex-end', gap: 6 }}>
+							{hasFixedDiscount && (
+								<div className='bf-mono' style={{ fontSize: 10.5, color: 'var(--bf-mute)', textDecoration: 'line-through', marginBottom: 1 }}>
+									Rs.{form.price.toLocaleString('en-PK')}
+								</div>
+							)}
+							<div style={{ font: '800 17px var(--bf-mono)', color: 'var(--bf-ember)', letterSpacing: '-.02em' }}>
+								{form.price > 0 ? `Rs.${effective.toLocaleString('en-PK')}` : 'Rs. —'}
+							</div>
+							{hasFixedDiscount && (
+								<span style={{ fontSize: 10, fontWeight: 700, background: '#DCFCE7', color: '#15803d', padding: '2px 6px', borderRadius: 999, marginBottom: 2 }}>
+									{form.discountMode === 'pct' && form.discountPct ? `-${form.discountPct}%` : `-Rs.${form.discountAmount}`}
+								</span>
+							)}
+						</div>
+					)}
+				</div>
+			</div>
+
+			{/* Checklist */}
+			<div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+				{[
+					{ ok: !!form.name.trim(), label: 'Product name' },
+					{ ok: !!form.category, label: 'Category' },
+					{
+						ok: form.pricingMode === 'fixed'
+							? form.price > 0
+							: form.sizes.filter(s => s.price && s.price > 0).length >= 1,
+						label: 'Price set',
+					},
+				].map(({ ok, label }) => (
+					<div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+						<div style={{
+							width: 16, height: 16, borderRadius: '50%',
+							background: ok ? '#DCFCE7' : 'var(--bf-cream-2)',
+							border: `1.5px solid ${ok ? '#86efac' : 'var(--bf-line-2)'}`,
+							display: 'grid', placeItems: 'center', flexShrink: 0,
+						}}>
+							{ok && <svg width={9} height={9} viewBox='0 0 24 24' fill='none' stroke='#15803d' strokeWidth={3}><path d='M4 12l5 5L20 6' /></svg>}
+						</div>
+						<span style={{ fontSize: 11.5, color: ok ? '#15803d' : 'var(--bf-mute)', fontWeight: ok ? 600 : 400 }}>{label}</span>
+					</div>
+				))}
+			</div>
+		</div>
+	)
+}
+
+// ─── Product Modal ────────────────────────────────────────────────────────────
+function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryCreate }: {
+	mode: 'add' | 'edit'
+	product: Product | null
+	categories: Category[]
+	onClose: () => void
+	onSaved: () => void
+	onCategoryCreate: (name: string) => Promise<Category>
+}) {
+	const [form, setForm] = useState<ProductForm>(() =>
+		product ? formFromProduct(product) : { ...EMPTY_FORM }
+	)
+	const [saving, setSaving] = useState(false)
+	const [saveError, setSaveError] = useState<string | null>(null)
+	const [catDialogOpen, setCatDialogOpen] = useState(false)
+	const [newCatName, setNewCatName] = useState('')
+	const [creatingCat, setCreatingCat] = useState(false)
+	const [catError, setCatError] = useState<string | null>(null)
+
+	function updateSize(idx: number, s: ProductSize) {
+		setForm(f => ({ ...f, sizes: f.sizes.map((v, i) => i === idx ? s : v) }))
 	}
 
-	function openEdit(p: Product) {
-		setForm({
-			name: p.name,
-			description: p.description ?? '',
-			price: p.price,
-			categoryId:
-				p.categoryId ??
-				categories.find((category) => category.name === p.category)?.id ??
-				null,
-			category: p.category,
-			imageUrl: p.imageUrl ?? null,
-			isAvailable: p.isAvailable,
-			isHot: p.isHot ?? false,
-			hasSizes: p.hasSizes ?? false,
-			priceSmall: p.priceSmall ?? null,
-			priceMedium: p.priceMedium ?? null,
-			priceLarge: p.priceLarge ?? null,
-		})
-		setSaveError(null)
-		setPanel({ mode: 'edit', product: p })
+	function removeSize(idx: number) {
+		setForm(f => ({ ...f, sizes: f.sizes.filter((_, i) => i !== idx) }))
 	}
 
-	function closePanel() {
-		setPanel({ mode: 'closed' })
-		setSaveError(null)
+	function addSize() {
+		setForm(f => ({ ...f, sizes: [...f.sizes, { name: '', price: null }] }))
 	}
 
 	async function handleSave() {
-		const needsSizes = form.hasSizes
-		const hasBasePrice = form.price > 0
-		const hasSizePrices = (form.priceSmall ?? 0) > 0 && (form.priceMedium ?? 0) > 0
-		if (!form.name.trim() || !form.category.trim()) {
-			setSaveError('Name and category are required.')
-			return
+		if (!form.name.trim()) { setSaveError('Product name is required.'); return }
+		if (!form.category) { setSaveError('Please select a category.'); return }
+		if (form.pricingMode === 'fixed') {
+			if (!(form.price > 0)) { setSaveError('Price is required.'); return }
+		} else {
+			const valid = form.sizes.filter(s => s.price && s.price > 0)
+			if (valid.length < 1) { setSaveError('Add at least one size with a price.'); return }
 		}
-		if (needsSizes && !hasSizePrices) {
-			setSaveError('Enter at least the two size prices (Small/Half and Medium/Full).')
-			return
-		}
-		if (!needsSizes && !hasBasePrice) {
-			setSaveError('Price is required.')
-			return
+		if (form.discountMode === 'pct' && form.discountPct && (form.discountPct <= 0 || form.discountPct >= 100)) {
+			setSaveError('Percentage must be between 1 and 99.'); return
 		}
 		setSaving(true)
 		setSaveError(null)
 		try {
-			// Auto-set base price to smallest size price for sized items
-			const payload = needsSizes && hasSizePrices
-				? { ...form, price: form.priceSmall ?? form.price }
-				: form
-			if (panel.mode === 'edit') {
-				await updateProduct(panel.product.id, payload)
+			const payload = mapFormToPayload(form)
+			if (mode === 'edit' && product) {
+				await updateProduct(product.id, payload as Parameters<typeof updateProduct>[1])
 			} else {
-				await createProduct(payload)
+				await createProduct(payload as Parameters<typeof createProduct>[0])
 			}
-			closePanel()
+			onSaved()
 		} catch {
 			setSaveError('Failed to save. Please try again.')
 		} finally {
@@ -152,41 +543,358 @@ export function AdminMenu() {
 		}
 	}
 
+	async function handleCreateCategory() {
+		const name = newCatName.trim()
+		if (!name) { setCatError('Name is required.'); return }
+		setCreatingCat(true)
+		setCatError(null)
+		try {
+			const cat = await onCategoryCreate(name)
+			setForm(f => ({ ...f, categoryId: cat.id, category: cat.name }))
+			setNewCatName('')
+			setCatDialogOpen(false)
+		} catch {
+			setCatError('Failed to create category.')
+		} finally {
+			setCreatingCat(false)
+		}
+	}
+
+	const validSizes = form.sizes.filter(s => s.price && s.price > 0)
+	const basePrice = form.pricingMode === 'sizes' ? (validSizes[0]?.price ?? 0) : form.price
+
+	return (
+		<div
+			style={{
+				position: 'fixed', inset: 0,
+				background: 'rgba(35,31,32,.65)', backdropFilter: 'blur(8px)',
+				display: 'flex', alignItems: 'center', justifyContent: 'center',
+				zIndex: 60, padding: 24,
+			}}
+			onClick={onClose}
+		>
+			<div
+				className='bf-card'
+				style={{
+					width: '100%', maxWidth: 900, maxHeight: '94vh',
+					overflow: 'hidden', display: 'flex', flexDirection: 'column',
+					borderRadius: 22, padding: 0,
+					boxShadow: '0 32px 80px rgba(35,31,32,.28)',
+				}}
+				onClick={e => e.stopPropagation()}
+			>
+				{/* Header */}
+				<div style={{ padding: '20px 28px 18px', borderBottom: '1px solid var(--bf-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, background: 'var(--bf-paper)' }}>
+					<div>
+						<div className='bf-eyebrow' style={{ marginBottom: 3 }}>{mode === 'add' ? 'ADD PRODUCT' : 'EDIT PRODUCT'}</div>
+						<h2 style={{ fontWeight: 800, fontSize: 22, margin: 0, letterSpacing: '-.025em' }}>
+							{form.name.trim() || (mode === 'add' ? 'New product' : 'Edit product')}
+						</h2>
+					</div>
+					<button className='bf-btn bf-btn-outline bf-btn-icon' onClick={onClose}>{Icons.x}</button>
+				</div>
+
+				{/* Body: 2-column */}
+				<div style={{ flex: 1, overflowY: 'auto', display: 'flex', gap: 0 }} className='bf-scroll'>
+
+					{/* Left: form */}
+					<div style={{ flex: 1, padding: '28px', display: 'flex', flexDirection: 'column', gap: 26, overflowY: 'auto', minWidth: 0 }} className='bf-scroll'>
+
+						{/* Section 1: Identity */}
+						<div>
+							<SectionLabel num={1} title='Product details' />
+							<div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+								<div>
+									<label className='bf-label'>Name <span className='bf-req'>*</span></label>
+									<input
+										className='bf-input'
+										value={form.name}
+										onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+										placeholder='e.g. Buddy Pepperoni Pizza'
+										autoFocus
+										style={{ fontSize: 15, fontWeight: 600 }}
+									/>
+								</div>
+								<div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'end' }}>
+									<div>
+										<label className='bf-label'>Category <span className='bf-req'>*</span></label>
+										<select
+											className='bf-input'
+											value={form.categoryId ?? ''}
+											onChange={e => {
+												const cat = categories.find(c => c.id === Number(e.target.value))
+												setForm(f => ({ ...f, categoryId: cat?.id ?? null, category: cat?.name ?? '' }))
+											}}
+										>
+											<option value='' disabled>Select category</option>
+											{categories.map(c => (
+												<option key={c.id} value={c.id}>{c.name}</option>
+											))}
+										</select>
+									</div>
+									<button
+										className='bf-btn bf-btn-outline bf-btn-sm'
+										onClick={() => { setCatError(null); setCatDialogOpen(true) }}
+										style={{ whiteSpace: 'nowrap', height: 44 }}
+									>
+										{Icons.plus} New
+									</button>
+								</div>
+								<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+									{([
+										{ key: 'isHot' as const, icon: '🌶', label: 'Hot item', desc: 'Shows a hot badge' },
+										{ key: 'isAvailable' as const, icon: '✓', label: 'Available', desc: 'Visible to customers' },
+									]).map(({ key, icon, label, desc }) => (
+										<button
+											key={key}
+											onClick={() => setForm(f => ({ ...f, [key]: !f[key] }))}
+											style={{
+												padding: '12px 14px', borderRadius: 12, textAlign: 'left',
+												border: `1.5px solid ${form[key] ? 'var(--bf-ink)' : 'var(--bf-line-2)'}`,
+												background: form[key] ? 'var(--bf-cream-2)' : 'var(--bf-paper)',
+												cursor: 'pointer', transition: 'all .15s',
+											}}
+										>
+											<div style={{ font: '700 13px var(--bf-font)', color: form[key] ? 'var(--bf-ink)' : 'var(--bf-mute)' }}>
+												{icon} {label}
+											</div>
+											<div style={{ fontSize: 10.5, color: 'var(--bf-mute)', marginTop: 2 }}>{desc}</div>
+										</button>
+									))}
+								</div>
+							</div>
+						</div>
+
+						<hr className='bf-rule' />
+
+						{/* Section 2: Pricing */}
+						<div>
+							<SectionLabel num={2} title='Pricing' />
+							<div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+								<PriceModeCard
+									active={form.pricingMode === 'fixed'}
+									icon={<>₹</>}
+									title='Fixed price'
+									desc='One price for all customers'
+									onClick={() => setForm(f => ({ ...f, pricingMode: 'fixed' }))}
+								/>
+								<PriceModeCard
+									active={form.pricingMode === 'sizes'}
+									icon={<>⊕</>}
+									title='Size variants'
+									desc='Unlimited sizes, each with own price'
+									onClick={() => setForm(f => ({ ...f, pricingMode: 'sizes' }))}
+								/>
+							</div>
+
+							{form.pricingMode === 'fixed' ? (
+								<div>
+									<label className='bf-label'>Price (Rs.) <span className='bf-req'>*</span></label>
+									<div style={{ position: 'relative' }}>
+										<span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--bf-mute)', fontSize: 12, pointerEvents: 'none' }}>Rs.</span>
+										<input
+											className='bf-input bf-mono'
+											type='number' min={0}
+											value={form.price || ''}
+											onChange={e => setForm(f => ({ ...f, price: parseFloat(e.target.value) || 0 }))}
+											placeholder='499'
+											style={{ paddingLeft: 38, fontWeight: 800, fontSize: 18 }}
+										/>
+									</div>
+								</div>
+							) : (
+								/* Dynamic size variants */
+								<div>
+									<div style={{ borderRadius: 14, border: '1px solid var(--bf-line)', overflow: 'hidden' }}>
+										{/* Header */}
+										<div style={{
+											display: 'grid', gridTemplateColumns: '28px 1fr 130px 108px 28px',
+											gap: 10, padding: '10px 16px',
+											background: 'var(--bf-cream-2)',
+											borderBottom: '1px solid var(--bf-line)',
+										}}>
+											<span />
+											{['SIZE NAME / LABEL', 'PRICE (Rs.)', 'FINAL PRICE', ''].map(h => (
+												<span key={h} style={{ font: '600 9.5px var(--bf-mono)', letterSpacing: '.08em', color: 'var(--bf-mute)', textTransform: 'uppercase' }}>{h}</span>
+											))}
+										</div>
+
+										{/* Size rows */}
+										{form.sizes.map((size, idx) => (
+											<SizeRowItem
+												key={idx}
+												idx={idx}
+												total={form.sizes.length}
+												size={size}
+												form={form}
+												onChange={s => updateSize(idx, s)}
+												onRemove={() => removeSize(idx)}
+											/>
+										))}
+
+										{/* Add size button */}
+										<div style={{ padding: '12px 16px', borderTop: form.sizes.length > 0 ? '1px solid var(--bf-line)' : 'none' }}>
+											<button
+												onClick={addSize}
+												style={{
+													display: 'flex', alignItems: 'center', gap: 8,
+													font: '600 12px var(--bf-font)', color: 'var(--bf-ink-2)',
+													background: 'none', border: '1.5px dashed var(--bf-line-2)',
+													borderRadius: 10, cursor: 'pointer', padding: '9px 14px',
+													width: '100%', transition: 'all .15s',
+												}}
+												onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--bf-ink)')}
+												onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--bf-line-2)')}
+											>
+												{Icons.plus}
+												<span>Add size</span>
+												<span style={{ fontSize: 11, color: 'var(--bf-mute)' }}>e.g. 14 inch, XL, Family…</span>
+											</button>
+										</div>
+									</div>
+
+									{/* Effective prices summary */}
+									{validSizes.length > 0 && form.discountMode !== 'none' && (
+										<div style={{ marginTop: 10, padding: '12px 16px', borderRadius: 10, background: 'var(--bf-cream-2)', border: '1px solid var(--bf-line)' }}>
+											<div className='bf-eyebrow' style={{ marginBottom: 8, fontSize: 9.5 }}>PRICES WITH DISCOUNT</div>
+											<div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+												{validSizes.map(s => (
+													<div key={s.name} style={{ textAlign: 'center' }}>
+														<div style={{ fontSize: 10, color: 'var(--bf-mute)', marginBottom: 2 }}>{s.name || '—'}</div>
+														<div className='bf-mono' style={{ fontWeight: 800, fontSize: 12, color: 'var(--bf-ember)' }}>
+															Rs.{calcEffective(s.price ?? 0, form.discountMode, form.discountPct, form.discountAmount).toLocaleString('en-PK')}
+														</div>
+													</div>
+												))}
+											</div>
+										</div>
+									)}
+								</div>
+							)}
+
+							<DiscountSection form={form} setForm={setForm} basePrice={basePrice} />
+						</div>
+
+						<hr className='bf-rule' />
+
+						{/* Section 3: Description */}
+						<div>
+							<SectionLabel num={3} title='Description' />
+							<textarea
+								className='bf-input'
+								rows={3}
+								value={form.description}
+								onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+								placeholder='Short, appetizing description shown on the menu…'
+								style={{ resize: 'vertical', lineHeight: 1.5 }}
+							/>
+						</div>
+
+						{saveError && (
+							<div style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(232,67,31,.1)', color: 'var(--bf-ember)', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 7 }}>
+								<span>⚠</span> {saveError}
+							</div>
+						)}
+					</div>
+
+					{/* Right: preview */}
+					<div style={{
+						width: 260, flexShrink: 0,
+						borderLeft: '1px solid var(--bf-line)',
+						background: 'var(--bf-cream-2)',
+						padding: 22, overflowY: 'auto',
+						position: 'sticky', top: 0, alignSelf: 'flex-start',
+						maxHeight: 'calc(94vh - 130px)',
+					}} className='bf-scroll'>
+						<ProductPreview form={form} />
+					</div>
+				</div>
+
+				{/* Footer */}
+				<div style={{ padding: '16px 28px', borderTop: '1px solid var(--bf-line)', display: 'flex', gap: 10, flexShrink: 0, background: 'var(--bf-cream-2)' }}>
+					<button className='bf-btn bf-btn-outline bf-btn-md' style={{ flex: 1 }} onClick={onClose} disabled={saving}>Cancel</button>
+					<button className='bf-btn bf-btn-primary bf-btn-md' style={{ flex: 2 }} disabled={saving} onClick={handleSave}>
+						{saving ? 'Saving…' : mode === 'add' ? 'Add product →' : 'Save changes →'}
+					</button>
+				</div>
+			</div>
+
+			{/* Category sub-modal */}
+			{catDialogOpen && (
+				<div
+					style={{ position: 'fixed', inset: 0, background: 'rgba(35,31,32,.5)', display: 'grid', placeItems: 'center', zIndex: 70 }}
+					onClick={() => !creatingCat && setCatDialogOpen(false)}
+				>
+					<div className='bf-card' style={{ padding: 28, maxWidth: 380, width: '100%', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
+						<h3 style={{ fontWeight: 800, fontSize: 17, marginBottom: 6 }}>Add new category</h3>
+						<p style={{ fontSize: 13, color: 'var(--bf-mute)', marginBottom: 18 }}>The new category will be auto-selected for this product.</p>
+						<div style={{ marginBottom: 14 }}>
+							<label className='bf-label'>Category name <span className='bf-req'>*</span></label>
+							<input
+								className='bf-input'
+								value={newCatName}
+								onChange={e => setNewCatName(e.target.value)}
+								onKeyDown={e => e.key === 'Enter' && handleCreateCategory()}
+								placeholder='e.g. Pizza, Drinks, Pasta…'
+								autoFocus
+							/>
+						</div>
+						{catError && (
+							<div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(232,67,31,.1)', color: 'var(--bf-ember)', fontSize: 12.5, fontWeight: 600, marginBottom: 14 }}>
+								{catError}
+							</div>
+						)}
+						<div style={{ display: 'flex', gap: 8 }}>
+							<button className='bf-btn bf-btn-outline bf-btn-md' style={{ flex: 1 }} disabled={creatingCat} onClick={() => setCatDialogOpen(false)}>Cancel</button>
+							<button className='bf-btn bf-btn-primary bf-btn-md' style={{ flex: 1 }} disabled={creatingCat} onClick={handleCreateCategory}>
+								{creatingCat ? 'Creating…' : 'Create'}
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
+		</div>
+	)
+}
+
+// ─── Menu Catalog ─────────────────────────────────────────────────────────────
+export function AdminMenu() {
+	const { data: products, isLoading, error, mutate } = useProducts()
+	const { data: categoriesData, isLoading: categoriesLoading, mutate: refreshCategories } = useCategories()
+	const [selectedCat, setSelectedCat] = useState<string | null>(null)
+	const [modal, setModal] = useState<'add' | Product | null>(null)
+	const [deleteId, setDeleteId] = useState<number | null>(null)
+	const [deleting, setDeleting] = useState(false)
+
+	const categories = useMemo(() =>
+		(categoriesData ?? [])
+			.filter(c => c.isActive)
+			.slice()
+			.sort((a, b) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999) || a.name.localeCompare(b.name)),
+		[categoriesData])
+
+	const activeCat = selectedCat ?? categories[0]?.name ?? null
+
+	const filteredProducts = useMemo(
+		() => (products ?? []).filter(p => p.category === activeCat),
+		[products, activeCat],
+	)
+
+	async function handleCategoryCreate(name: string) {
+		const cat = await createCategory({ name })
+		await refreshCategories()
+		setSelectedCat(cat.name)
+		return cat
+	}
+
 	async function handleDelete(id: number) {
 		setDeleting(true)
 		try {
 			await deleteProduct(id)
+			await mutate()
 			setDeleteId(null)
-		} catch {
-			// ignore
 		} finally {
 			setDeleting(false)
-		}
-	}
-
-	async function handleCreateCategory() {
-		const name = newCategoryName.trim()
-		if (!name) {
-			setCategoryError('Category name is required.')
-			return
-		}
-		setCreatingCategory(true)
-		setCategoryError(null)
-		try {
-			const category = await createCategory({ name })
-			await refreshCategories()
-			setSelectedCat(category.name)
-			setForm((f) => ({
-				...f,
-				categoryId: category.id,
-				category: category.name,
-			}))
-			setNewCategoryName('')
-			setCategoryDialogOpen(false)
-		} catch {
-			setCategoryError('Failed to create category. Please try again.')
-		} finally {
-			setCreatingCategory(false)
 		}
 	}
 
@@ -202,79 +910,35 @@ export function AdminMenu() {
 						: `${itemCount} ITEMS · ${categories.length} CATEGORIES`
 				}
 			/>
-			<div
-				style={{
-					padding: 28,
-					display: 'grid',
-					gridTemplateColumns: panel.mode !== 'closed' ? '200px 1fr 320px' : '200px 1fr',
-					gap: 20,
-					transition: 'grid-template-columns .2s',
-				}}
-			>
+
+			<div style={{ padding: 28, display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20 }}>
 				{/* Category sidebar */}
 				<div className='bf-card' style={{ padding: 12, height: 'fit-content' }}>
-					<div className='bf-eyebrow' style={{ padding: '6px 10px' }}>
-						CATEGORIES
-					</div>
+					<div className='bf-eyebrow' style={{ padding: '6px 10px 10px' }}>CATEGORIES</div>
 					{isLoading || categoriesLoading ? (
-						<div
-							style={{
-								display: 'flex',
-								flexDirection: 'column',
-								gap: 6,
-								padding: '6px 0',
-							}}
-						>
-							{Array.from({ length: 5 }).map((_, i) => (
-								<Skeleton key={i} h={34} r={8} />
-							))}
+						<div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 0' }}>
+							{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} h={34} r={8} />)}
 						</div>
 					) : categories.length === 0 ? (
-						<p
-							style={{
-								fontSize: 12,
-								color: 'var(--bf-mute)',
-								padding: '8px 10px',
-							}}
-						>
-							No categories yet
-						</p>
+						<p style={{ fontSize: 12, color: 'var(--bf-mute)', padding: '4px 10px' }}>No categories yet</p>
 					) : (
-						categories.map((category) => {
-							const c = category.name
-							const count = (products ?? []).filter(
-								(p) => p.category === c,
-							).length
+						categories.map(cat => {
+							const count = (products ?? []).filter(p => p.category === cat.name).length
 							return (
 								<button
-									key={c}
-									onClick={() => setSelectedCat(c)}
-									className={`bf-sidebar-item${activeCat === c ? ' bf-sidebar-item--active' : ''}`}
+									key={cat.name}
+									onClick={() => setSelectedCat(cat.name)}
+									className={`bf-sidebar-item${activeCat === cat.name ? ' bf-sidebar-item--active' : ''}`}
 									style={{
-										display: 'flex',
-										justifyContent: 'space-between',
-										alignItems: 'center',
-										width: '100%',
-										padding: '9px 10px',
-										border: 0,
-										background:
-											activeCat === c
-												? 'var(--bf-cream-2)'
-												: 'transparent',
-										borderRadius: 8,
-										cursor: 'pointer',
-										font: '600 13px var(--bf-font)',
-										textAlign: 'left',
-										color: 'var(--bf-ink)',
+										display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+										width: '100%', padding: '9px 10px', border: 0,
+										background: activeCat === cat.name ? 'var(--bf-cream-2)' : 'transparent',
+										borderRadius: 8, cursor: 'pointer',
+										font: '600 13px var(--bf-font)', textAlign: 'left', color: 'var(--bf-ink)',
 									}}
 								>
-									<span>{c}</span>
-									<span
-										className='bf-mono'
-										style={{ fontSize: 11, color: 'var(--bf-mute)' }}
-									>
-										{count}
-									</span>
+									<span>{cat.name}</span>
+									<span className='bf-mono' style={{ fontSize: 11, color: 'var(--bf-mute)' }}>{count}</span>
 								</button>
 							)
 						})
@@ -283,101 +947,46 @@ export function AdminMenu() {
 
 				{/* Items table */}
 				<div className='bf-card' style={{ padding: 0, overflow: 'hidden' }}>
-					<div
-						style={{
-							padding: '16px 22px',
-							display: 'flex',
-							justifyContent: 'space-between',
-							alignItems: 'center',
-							borderBottom: '1px solid var(--bf-line)',
-						}}
-					>
+					<div style={{ padding: '16px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--bf-line)' }}>
 						<h2 style={{ fontWeight: 700, fontSize: 18, margin: 0 }}>
 							{activeCat ?? 'All items'} ·{' '}
-							<span
-								className='bf-mono'
-								style={{ fontWeight: 400, fontSize: 14 }}
-							>
-								{filteredProducts.length} items
-							</span>
+							<span className='bf-mono' style={{ fontWeight: 400, fontSize: 14 }}>{filteredProducts.length} items</span>
 						</h2>
-						<div style={{ display: 'flex', gap: 6 }}>
-							<button
-								className='bf-btn bf-btn-primary bf-btn-sm'
-								onClick={openAdd}
-							>
-								{Icons.plus} Add item
-							</button>
-						</div>
+						<button className='bf-btn bf-btn-primary bf-btn-sm' onClick={() => setModal('add')}>
+							{Icons.plus} Add item
+						</button>
 					</div>
 
 					{/* Table header */}
-					<div
-						style={{
-							display: 'grid',
-							gridTemplateColumns: '40px 64px 1.4fr 1fr 110px 110px 80px',
-							gap: 12,
-							font: '600 10.5px var(--bf-mono)',
-							color: 'var(--bf-mute)',
-							letterSpacing: '.08em',
-							textTransform: 'uppercase',
-							padding: '10px 22px',
-							borderBottom: '1px solid var(--bf-line)',
-							background: 'var(--bf-cream-2)',
-						}}
-					>
-						<span />
-						<span>IMAGE</span>
-						<span>NAME</span>
-						<span>CATEGORY</span>
-						<span>PRICE</span>
-						<span>STATUS</span>
+					<div style={{
+						display: 'grid', gridTemplateColumns: '44px 64px 1.4fr 1fr 160px 110px 80px',
+						gap: 12, font: '600 10px var(--bf-mono)', color: 'var(--bf-mute)',
+						letterSpacing: '.08em', textTransform: 'uppercase',
+						padding: '10px 22px', borderBottom: '1px solid var(--bf-line)',
+						background: 'var(--bf-cream-2)',
+					}}>
+						<span /><span>IMAGE</span><span>NAME</span><span>CATEGORY</span>
+						<span>PRICE</span><span>STATUS</span>
 						<span style={{ textAlign: 'right' }}>ACTIONS</span>
 					</div>
 
 					{isLoading ? (
-						<div
-							style={{
-								display: 'flex',
-								flexDirection: 'column',
-								gap: 0,
-							}}
-						>
+						<div style={{ display: 'flex', flexDirection: 'column' }}>
 							{Array.from({ length: 4 }).map((_, i) => (
-								<div
-									key={i}
-									style={{
-										display: 'grid',
-										gridTemplateColumns:
-											'40px 64px 1.4fr 1fr 110px 110px 80px',
-										gap: 12,
-										padding: '14px 22px',
-										borderBottom: '1px solid var(--bf-line)',
-										alignItems: 'center',
-									}}
-								>
+								<div key={i} style={{
+									display: 'grid', gridTemplateColumns: '44px 64px 1.4fr 1fr 160px 110px 80px',
+									gap: 12, padding: '14px 22px', borderBottom: '1px solid var(--bf-line)', alignItems: 'center',
+								}}>
 									<Skeleton h={16} w={16} r={4} />
 									<Skeleton h={44} w={44} r={8} />
-									<div
-										style={{
-											display: 'flex',
-											flexDirection: 'column',
-											gap: 5,
-										}}
-									>
+									<div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
 										<Skeleton h={13} w='80%' />
 										<Skeleton h={10} w='40%' />
 									</div>
 									<Skeleton h={13} w='70%' />
-									<Skeleton h={14} w={70} />
+									<Skeleton h={14} w={90} />
 									<Skeleton h={20} w={60} r={999} />
-									<div
-										style={{
-											display: 'flex',
-											gap: 4,
-											justifyContent: 'flex-end',
-										}}
-									>
+									<div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
 										<Skeleton h={28} w={28} r={999} />
 										<Skeleton h={28} w={28} r={999} />
 									</div>
@@ -385,551 +994,130 @@ export function AdminMenu() {
 							))}
 						</div>
 					) : error ? (
-						<div
-							style={{
-								padding: '32px',
-								textAlign: 'center',
-							}}
-						>
-							<p
-								style={{
-									color: 'var(--bf-mute)',
-									fontSize: 13,
-									marginBottom: 12,
-								}}
-							>
-								Could not load products
-							</p>
-							<button
-								className='bf-btn bf-btn-outline bf-btn-sm'
-								onClick={() => mutate()}
-							>
-								Retry
-							</button>
+						<div style={{ padding: 32, textAlign: 'center' }}>
+							<p style={{ color: 'var(--bf-mute)', fontSize: 13, marginBottom: 12 }}>Could not load products</p>
+							<button className='bf-btn bf-btn-outline bf-btn-sm' onClick={() => mutate()}>Retry</button>
 						</div>
 					) : filteredProducts.length === 0 ? (
-						<div
-							style={{
-								padding: '48px',
-								textAlign: 'center',
-							}}
-						>
-							<p
-								style={{ color: 'var(--bf-mute)', fontSize: 13, marginBottom: 14 }}
-							>
-								No items in this category
-							</p>
-							<button
-								className='bf-btn bf-btn-primary bf-btn-sm'
-								onClick={openAdd}
-							>
+						<div style={{ padding: '48px 32px', textAlign: 'center' }}>
+							<p style={{ color: 'var(--bf-mute)', fontSize: 13, marginBottom: 14 }}>No items in this category</p>
+							<button className='bf-btn bf-btn-primary bf-btn-sm' onClick={() => setModal('add')}>
 								{Icons.plus} Add first item
 							</button>
 						</div>
 					) : (
-						filteredProducts.map((it, i) => (
-							<div
-								key={it.id}
-								style={{
-									display: 'grid',
-									gridTemplateColumns:
-										'40px 64px 1.4fr 1fr 110px 110px 80px',
-									gap: 12,
-									padding: '12px 22px',
-									borderBottom:
-										i < filteredProducts.length - 1
-											? '1px solid var(--bf-line)'
-											: 'none',
-									alignItems: 'center',
-								}}
-							>
-								<input type='checkbox' />
-								<FoodImg
-									tone={TONES[i % TONES.length]}
-									style={{ width: 44, height: 44 }}
-								/>
-								<div>
-									<div style={{ font: '700 14px var(--bf-font)' }}>
-										{it.name}
+						filteredProducts.map((it, i) => {
+							const hasDis = (it.discountPct && it.discountPct > 0) || (it.discountAmount && it.discountAmount > 0)
+							const dm = discountModeFromProduct(it)
+
+							// Compute display price
+							let displayBase = it.price
+							let sizeLabel = ''
+							if (it.hasSizes) {
+								try {
+									const sizes = it.sizesJson ? (JSON.parse(it.sizesJson) as ProductSize[]).filter(s => s.price && s.price > 0) : []
+									if (sizes.length > 0) {
+										displayBase = sizes[0].price ?? it.price
+										sizeLabel = 'From '
+									} else {
+										displayBase = it.priceSmall ?? it.price
+										sizeLabel = 'From '
+									}
+								} catch {
+									displayBase = it.priceSmall ?? it.price
+									sizeLabel = 'From '
+								}
+							}
+							const eff = calcEffective(displayBase, dm, it.discountPct ?? null, it.discountAmount ?? null)
+
+							return (
+								<div
+									key={it.id}
+									style={{
+										display: 'grid', gridTemplateColumns: '44px 64px 1.4fr 1fr 160px 110px 80px',
+										gap: 12, padding: '12px 22px',
+										borderBottom: i < filteredProducts.length - 1 ? '1px solid var(--bf-line)' : 'none',
+										alignItems: 'center',
+									}}
+								>
+									<input type='checkbox' style={{ width: 15, height: 15, accentColor: 'var(--bf-ink)', cursor: 'pointer' }} />
+									<FoodImg tone={TONES[i % TONES.length]} style={{ width: 44, height: 44 }} />
+									<div>
+										<div style={{ font: '700 14px var(--bf-font)' }}>{it.name}</div>
+										<div className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)', marginTop: 2, display: 'flex', gap: 6 }}>
+											<span>ID-{it.id}</span>
+											{it.isHot && <span style={{ color: 'var(--bf-ember)' }}>🌶 HOT</span>}
+											{hasDis && <span style={{ color: '#15803d' }}>● DISC</span>}
+											{it.hasSizes && <span style={{ color: 'var(--bf-ink-2)' }}>SIZES</span>}
+										</div>
 									</div>
-									<div
-										className='bf-mono'
-										style={{ fontSize: 10.5, color: 'var(--bf-mute)' }}
-									>
-										ID-{it.id}
-										{it.isHot && (
-											<span
-												style={{
-													marginLeft: 6,
-													color: 'var(--bf-ember)',
-												}}
-											>
-												HOT
+									<span style={{ fontSize: 13, color: 'var(--bf-ink-2)' }}>{it.category}</span>
+									<div>
+										<div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+											{hasDis && (
+												<span className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)', textDecoration: 'line-through' }}>
+													Rs.{displayBase.toLocaleString('en-PK')}
+												</span>
+											)}
+											<span className='bf-tabular' style={{ fontWeight: 800, fontSize: 14 }}>
+												{sizeLabel && <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--bf-mute)' }}>{sizeLabel}</span>}
+												{rs(eff)}
+											</span>
+										</div>
+										{hasDis && (
+											<span style={{ fontSize: 10, fontWeight: 700, color: '#15803d', background: '#DCFCE7', padding: '1px 5px', borderRadius: 4 }}>
+												{it.discountPct ? `${it.discountPct}% off` : `Rs.${it.discountAmount} off`}
 											</span>
 										)}
 									</div>
+									<span>
+										{it.isAvailable ? (
+											<span className='bf-pill' style={{ background: '#DCFCE7', color: '#166534', boxShadow: 'none' }}>
+												<span className='bf-dot bf-dot-ready' /> LIVE
+											</span>
+										) : (
+											<span className='bf-pill' style={{ background: '#F1ECE3', color: 'var(--bf-mute)', boxShadow: 'none' }}>OFF</span>
+										)}
+									</span>
+									<div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+										<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 28, height: 28 }} onClick={() => setModal(it)}>{Icons.edit}</button>
+										<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 28, height: 28, color: 'var(--bf-ember)' }} onClick={() => setDeleteId(it.id)}>{Icons.trash}</button>
+									</div>
 								</div>
-								<span
-									style={{ fontSize: 13, color: 'var(--bf-ink-2)' }}
-								>
-									{it.category}
-								</span>
-								<span
-									style={{ fontWeight: 800, fontSize: 14 }}
-									className='bf-tabular'
-								>
-									{it.hasSizes && it.priceSmall
-										? <>
-											<span style={{ fontSize: 10, fontWeight: 600, color: 'var(--bf-mute)' }}>From </span>
-											{rs(it.priceSmall)}
-										</>
-										: rs(it.price)
-									}
-								</span>
-								<span>
-									{it.isAvailable ? (
-										<span
-											className='bf-pill'
-											style={{
-												background: '#DCFCE7',
-												color: '#166534',
-												boxShadow: 'none',
-											}}
-										>
-											<span className='bf-dot bf-dot-ready' />
-											LIVE
-										</span>
-									) : (
-										<span
-											className='bf-pill'
-											style={{
-												background: '#F1ECE3',
-												color: 'var(--bf-mute)',
-												boxShadow: 'none',
-											}}
-										>
-											OFF
-										</span>
-									)}
-								</span>
-								<div
-									style={{
-										display: 'flex',
-										gap: 4,
-										justifyContent: 'flex-end',
-									}}
-								>
-									<button
-										className='bf-btn bf-btn-ghost bf-btn-icon'
-										style={{ width: 28, height: 28 }}
-										onClick={() => openEdit(it)}
-									>
-										{Icons.edit}
-									</button>
-									<button
-										className='bf-btn bf-btn-ghost bf-btn-icon'
-										style={{
-											width: 28,
-											height: 28,
-											color: 'var(--bf-ember)',
-										}}
-										onClick={() => setDeleteId(it.id)}
-									>
-										{Icons.trash}
-									</button>
-								</div>
-							</div>
-						))
+							)
+						})
 					)}
 				</div>
-
-				{/* Add / Edit panel */}
-				{panel.mode !== 'closed' && (
-					<div className='bf-card' style={{ padding: 22, height: 'fit-content' }}>
-						<div
-							style={{
-								display: 'flex',
-								justifyContent: 'space-between',
-								alignItems: 'center',
-								marginBottom: 16,
-							}}
-						>
-							<div className='bf-eyebrow'>
-								{panel.mode === 'add' ? 'ADD ITEM' : 'EDIT ITEM'}
-							</div>
-							<button
-								className='bf-btn bf-btn-ghost bf-btn-icon'
-								style={{ width: 28, height: 28 }}
-								onClick={closePanel}
-							>
-								✕
-							</button>
-						</div>
-
-						<div
-							style={{
-								display: 'flex',
-								flexDirection: 'column',
-								gap: 14,
-							}}
-						>
-							<div>
-								<label className='bf-label'>Name <span className='bf-req'>*</span></label>
-								<input
-									className='bf-input'
-									value={form.name}
-									onChange={(e) =>
-										setForm((f) => ({ ...f, name: e.target.value }))
-									}
-									placeholder='e.g. Buddy Pepperoni'
-								/>
-							</div>
-							<div>
-								<label className='bf-label'>Category <span className='bf-req'>*</span></label>
-								<select
-									className='bf-input'
-									value={form.categoryId ?? ''}
-									onChange={(e) => {
-										const category = categories.find(
-											(c) => c.id === Number(e.target.value),
-										)
-										setForm((f) => ({
-											...f,
-											categoryId: category?.id ?? null,
-											category: category?.name ?? '',
-										}))
-									}}
-								>
-									<option value='' disabled>
-										Select category
-									</option>
-									{categories.map((category) => (
-										<option key={category.id} value={category.id}>
-											{category.name}
-										</option>
-									))}
-								</select>
-								<button
-									className='bf-btn bf-btn-outline bf-btn-sm'
-									style={{ width: '100%', marginTop: 8 }}
-									onClick={() => {
-										setCategoryError(null)
-										setCategoryDialogOpen(true)
-									}}
-								>
-									{Icons.plus} Add new category
-								</button>
-							</div>
-							{!form.hasSizes ? (
-								<div>
-									<label className='bf-label'>Price (Rs.) <span className='bf-req'>*</span></label>
-									<input
-										className='bf-input'
-										type='number'
-										min={0}
-										value={form.price || ''}
-										onChange={(e) =>
-											setForm((f) => ({
-												...f,
-												price: parseFloat(e.target.value) || 0,
-											}))
-										}
-										placeholder='349'
-									/>
-								</div>
-							) : (
-								<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-									<label className='bf-label'>
-										Size Prices (Rs.) <span className='bf-req'>*</span>
-										<span style={{ fontWeight: 400, color: 'var(--bf-mute)', marginLeft: 6 }}>
-											{form.priceLarge ? 'S / M / L' : 'Half / Full'}
-										</span>
-									</label>
-									<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-										<div>
-											<label className='bf-label' style={{ fontSize: 10 }}>
-												{form.priceLarge ? 'Small (6\")' : 'Half'}
-											</label>
-											<input
-												className='bf-input'
-												type='number'
-												min={0}
-												value={form.priceSmall || ''}
-												onChange={(e) => setForm(f => ({ ...f, priceSmall: parseFloat(e.target.value) || null }))}
-												placeholder='330'
-											/>
-										</div>
-										<div>
-											<label className='bf-label' style={{ fontSize: 10 }}>
-												{form.priceLarge ? 'Medium (9\")' : 'Full'}
-											</label>
-											<input
-												className='bf-input'
-												type='number'
-												min={0}
-												value={form.priceMedium || ''}
-												onChange={(e) => setForm(f => ({ ...f, priceMedium: parseFloat(e.target.value) || null }))}
-												placeholder='650'
-											/>
-										</div>
-									</div>
-									<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-										<button
-											type='button'
-											onClick={() => setForm(f => ({ ...f, priceLarge: f.priceLarge ? null : 0 }))}
-											style={{
-												width: 16, height: 16, borderRadius: 4, border: `2px solid ${form.priceLarge !== null && form.priceLarge !== undefined ? 'var(--bf-ink)' : 'var(--bf-line-2)'}`,
-												background: form.priceLarge !== null && form.priceLarge !== undefined ? 'var(--bf-ink)' : 'transparent',
-												cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-											}}
-										>
-											{form.priceLarge !== null && form.priceLarge !== undefined && (
-												<svg width={8} height={8} viewBox='0 0 24 24' fill='none' stroke='#fff' strokeWidth={3}><path d='M4 12l5 5L20 6' /></svg>
-											)}
-										</button>
-										<span style={{ fontSize: 12, color: 'var(--bf-ink-2)' }}>Has a Large (12") size</span>
-										{form.priceLarge !== null && form.priceLarge !== undefined && (
-											<input
-												className='bf-input'
-												type='number'
-												min={0}
-												value={form.priceLarge || ''}
-												onChange={(e) => setForm(f => ({ ...f, priceLarge: parseFloat(e.target.value) || 0 }))}
-												placeholder='930'
-												style={{ flex: 1, minWidth: 0 }}
-											/>
-										)}
-									</div>
-								</div>
-							)}
-							<div>
-								<label className='bf-label'>Description <span className='bf-opt'>(optional)</span></label>
-								<textarea
-									className='bf-input'
-									rows={2}
-									value={form.description ?? ''}
-									onChange={(e) =>
-										setForm((f) => ({
-											...f,
-											description: e.target.value,
-										}))
-									}
-									placeholder='Short description…'
-									style={{ resize: 'vertical' }}
-								/>
-							</div>
-
-							<div
-								style={{
-									display: 'grid',
-									gridTemplateColumns: '1fr 1fr 1fr',
-									gap: 8,
-								}}
-							>
-								{(
-									[
-										['isAvailable', 'Available'],
-										['isHot', 'Hot item'],
-										['hasSizes', 'Has sizes'],
-									] as const
-								).map(([key, label]) => (
-									<button
-										key={key}
-										onClick={() =>
-											setForm((f) => ({ ...f, [key]: !f[key] }))
-										}
-										className='bf-toggle-btn'
-										style={{
-											padding: '8px 6px',
-											borderRadius: 10,
-											border:
-												'1.5px solid ' +
-												(form[key]
-													? 'var(--bf-ink)'
-													: 'var(--bf-line-2)'),
-											background: form[key]
-												? 'var(--bf-cream-2)'
-												: 'var(--bf-paper)',
-											cursor: 'pointer',
-											font: '600 11.5px var(--bf-font)',
-											color: form[key]
-												? 'var(--bf-ink)'
-												: 'var(--bf-mute)',
-										}}
-									>
-										{form[key] ? '✓ ' : ''}
-										{label}
-									</button>
-								))}
-							</div>
-
-							{saveError && (
-								<div
-									style={{
-										padding: '8px 12px',
-										borderRadius: 10,
-										background: 'rgba(232,67,31,.1)',
-										color: 'var(--bf-ember)',
-										fontSize: 12.5,
-										fontWeight: 600,
-									}}
-								>
-									{saveError}
-								</div>
-							)}
-
-							<hr className='bf-rule' />
-							<div style={{ display: 'flex', gap: 8 }}>
-								<button
-									className='bf-btn bf-btn-outline bf-btn-md'
-									style={{ flex: 1 }}
-									onClick={closePanel}
-								>
-									Cancel
-								</button>
-								<button
-									className='bf-btn bf-btn-primary bf-btn-md'
-									style={{ flex: 2 }}
-									disabled={saving}
-									onClick={handleSave}
-								>
-									{saving ? 'Saving…' : panel.mode === 'add' ? 'Add item' : 'Save changes'}
-								</button>
-							</div>
-						</div>
-					</div>
-				)}
 			</div>
 
-			{/* Category creation overlay */}
-			{categoryDialogOpen && (
-				<div
-					style={{
-						position: 'fixed',
-						inset: 0,
-						background: 'rgba(35,31,32,.5)',
-						display: 'grid',
-						placeItems: 'center',
-						zIndex: 55,
-					}}
-					onClick={() => !creatingCategory && setCategoryDialogOpen(false)}
-				>
-					<div
-						className='bf-card'
-						style={{ padding: 28, maxWidth: 380, width: '100%' }}
-						onClick={(e) => e.stopPropagation()}
-					>
-						<h3
-							style={{
-								fontWeight: 800,
-								fontSize: 17,
-								marginBottom: 8,
-							}}
-						>
-							Add new category
-						</h3>
-						<p
-							style={{
-								fontSize: 13,
-								color: 'var(--bf-mute)',
-								marginBottom: 18,
-							}}
-						>
-							Create a category and select it for this item.
-						</p>
-						<div style={{ marginBottom: 14 }}>
-							<label className='bf-label'>Category name <span className='bf-req'>*</span></label>
-							<input
-								className='bf-input'
-								value={newCategoryName}
-								onChange={(e) => setNewCategoryName(e.target.value)}
-								placeholder='e.g. Pizza'
-								autoFocus
-							/>
-						</div>
-						{categoryError && (
-							<div
-								style={{
-									padding: '8px 12px',
-									borderRadius: 10,
-									background: 'rgba(232,67,31,.1)',
-									color: 'var(--bf-ember)',
-									fontSize: 12.5,
-									fontWeight: 600,
-									marginBottom: 14,
-								}}
-							>
-								{categoryError}
-							</div>
-						)}
-						<div style={{ display: 'flex', gap: 8 }}>
-							<button
-								className='bf-btn bf-btn-outline bf-btn-md'
-								style={{ flex: 1 }}
-								disabled={creatingCategory}
-								onClick={() => setCategoryDialogOpen(false)}
-							>
-								Cancel
-							</button>
-							<button
-								className='bf-btn bf-btn-primary bf-btn-md'
-								style={{ flex: 1 }}
-								disabled={creatingCategory}
-								onClick={handleCreateCategory}
-							>
-								{creatingCategory ? 'Creating…' : 'Create'}
-							</button>
-						</div>
-					</div>
-				</div>
+			{/* Product Modal */}
+			{modal !== null && (
+				<ProductModal
+					mode={modal === 'add' ? 'add' : 'edit'}
+					product={modal === 'add' ? null : modal}
+					categories={categories}
+					onClose={() => setModal(null)}
+					onSaved={async () => { await mutate(); setModal(null) }}
+					onCategoryCreate={handleCategoryCreate}
+				/>
 			)}
 
-			{/* Delete confirmation overlay */}
+			{/* Delete confirmation */}
 			{deleteId !== null && (
 				<div
-					style={{
-						position: 'fixed',
-						inset: 0,
-						background: 'rgba(35,31,32,.5)',
-						display: 'grid',
-						placeItems: 'center',
-						zIndex: 50,
-					}}
+					style={{ position: 'fixed', inset: 0, background: 'rgba(35,31,32,.55)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center', zIndex: 60 }}
 					onClick={() => !deleting && setDeleteId(null)}
 				>
-					<div
-						className='bf-card'
-						style={{ padding: 28, maxWidth: 360, width: '100%' }}
-						onClick={(e) => e.stopPropagation()}
-					>
-						<h3
-							style={{
-								fontWeight: 800,
-								fontSize: 17,
-								marginBottom: 8,
-							}}
-						>
-							Delete item?
-						</h3>
-						<p
-							style={{
-								fontSize: 13,
-								color: 'var(--bf-mute)',
-								marginBottom: 20,
-							}}
-						>
-							This will permanently remove the item from the menu. This
-							cannot be undone.
+					<div className='bf-card' style={{ padding: 28, maxWidth: 360, width: '100%', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
+						<div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(232,67,31,.1)', display: 'grid', placeItems: 'center', marginBottom: 14, color: 'var(--bf-ember)', fontSize: 20 }}>
+							{Icons.trash}
+						</div>
+						<h3 style={{ fontWeight: 800, fontSize: 17, marginBottom: 6 }}>Delete product?</h3>
+						<p style={{ fontSize: 13, color: 'var(--bf-mute)', marginBottom: 22 }}>
+							This will permanently remove this product from the menu. This cannot be undone.
 						</p>
 						<div style={{ display: 'flex', gap: 8 }}>
-							<button
-								className='bf-btn bf-btn-outline bf-btn-md'
-								style={{ flex: 1 }}
-								disabled={deleting}
-								onClick={() => setDeleteId(null)}
-							>
-								Cancel
-							</button>
+							<button className='bf-btn bf-btn-outline bf-btn-md' style={{ flex: 1 }} disabled={deleting} onClick={() => setDeleteId(null)}>Cancel</button>
 							<button
 								className='bf-btn bf-btn-primary bf-btn-md'
 								style={{ flex: 1, background: 'var(--bf-ember)' }}

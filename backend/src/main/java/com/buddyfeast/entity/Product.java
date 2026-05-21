@@ -30,6 +30,16 @@ public class Product {
     private Double priceMedium;
     private Double priceLarge;
 
+    private String labelSmall;
+    private String labelMedium;
+    private String labelLarge;
+
+    private Double discountPct;
+    private Double discountAmount;
+
+    @Column(columnDefinition = "TEXT")
+    private String sizesJson;
+
     private Boolean isAvailable = true;
     private Boolean isHot = false;
     private Boolean hasSizes = false;

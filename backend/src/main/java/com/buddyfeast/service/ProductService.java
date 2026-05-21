@@ -59,6 +59,12 @@ public class ProductService {
             .priceSmall(productDetails.getPriceSmall())
             .priceMedium(productDetails.getPriceMedium())
             .priceLarge(productDetails.getPriceLarge())
+            .labelSmall(productDetails.getLabelSmall())
+            .labelMedium(productDetails.getLabelMedium())
+            .labelLarge(productDetails.getLabelLarge())
+            .discountPct(productDetails.getDiscountPct())
+            .discountAmount(productDetails.getDiscountAmount())
+            .sizesJson(productDetails.getSizesJson())
             .category(resolveCategory(productDetails))
             .isAvailable(productDetails.getIsAvailable() != null ? productDetails.getIsAvailable() : true)
             .isHot(productDetails.getIsHot() != null ? productDetails.getIsHot() : false)
@@ -79,6 +85,12 @@ public class ProductService {
         product.setPriceSmall(productDetails.getPriceSmall());
         product.setPriceMedium(productDetails.getPriceMedium());
         product.setPriceLarge(productDetails.getPriceLarge());
+        product.setLabelSmall(productDetails.getLabelSmall());
+        product.setLabelMedium(productDetails.getLabelMedium());
+        product.setLabelLarge(productDetails.getLabelLarge());
+        product.setDiscountPct(productDetails.getDiscountPct());
+        product.setDiscountAmount(productDetails.getDiscountAmount());
+        product.setSizesJson(productDetails.getSizesJson());
         product.setIsAvailable(productDetails.getIsAvailable());
         product.setIsHot(productDetails.getIsHot());
         product.setHasSizes(productDetails.getHasSizes());
@@ -101,6 +113,12 @@ public class ProductService {
             .priceSmall(product.getPriceSmall())
             .priceMedium(product.getPriceMedium())
             .priceLarge(product.getPriceLarge())
+            .labelSmall(product.getLabelSmall())
+            .labelMedium(product.getLabelMedium())
+            .labelLarge(product.getLabelLarge())
+            .discountPct(product.getDiscountPct())
+            .discountAmount(product.getDiscountAmount())
+            .sizesJson(product.getSizesJson())
             .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
             .category(product.getCategory() != null ? product.getCategory().getName() : "")
             .isAvailable(product.getIsAvailable())

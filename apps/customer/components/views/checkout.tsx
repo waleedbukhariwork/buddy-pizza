@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { Logo } from '../ui/logo'
@@ -8,7 +8,8 @@ import { CartTotals } from '../ui/cart-totals'
 import { FoodImg } from '../ui/food-img'
 import { Stepper } from './confirmation'
 import { useCartStore } from '../../lib/cart-store'
-import { rs, placeOrder } from '../../lib/hooks'
+import { useAuthStore } from '../../lib/auth-store'
+import { rs, placeOrder, clearServerCart } from '../../lib/hooks'
 import type { CartItem } from '@shared/index'
 
 // ─── Compute clock arrival time ───────────────────────────────────────────────
@@ -83,16 +84,35 @@ function PlaceOrderBtn({ submitting, subtotal, itemCount, mobile }: { submitting
 // ─── CHECKOUT ─────────────────────────────────────────────────────────────────
 function CheckoutExperience() {
 	const router = useRouter()
+	const { user, token, hydrate } = useAuthStore()
 	const items = useCartStore((s) => s.items)
 	const removeItem = useCartStore((s) => s.removeItem)
 	const clearCart = useCartStore((s) => s.clearCart)
 	const subtotal = items.reduce((s, i) => s + (i.sizePrice ?? i.price) * i.quantity, 0)
 
+	const [hydrated, setHydrated] = useState(false)
 	const [gpsLoading, setGpsLoading] = useState(false)
-	const [area, setArea] = useState('DHA Phase 5, Sector A')
-	const [house, setHouse] = useState('House 42, Street 18')
+	const [area, setArea] = useState('')
+	const [house, setHouse] = useState('')
 	const [fullName, setFullName] = useState('')
 	const [phone, setPhone] = useState('')
+
+	useEffect(() => {
+		hydrate()
+		setHydrated(true)
+	}, [hydrate])
+
+	useEffect(() => {
+		if (!hydrated) return
+		if (!token) {
+			router.replace('/auth/login?redirect=/checkout')
+			return
+		}
+		if (user) {
+			if (user.name) setFullName(user.name)
+			if (user.phone) setPhone(user.phone)
+		}
+	}, [hydrated, token, user, router])
 	const [showLandmark, setShowLandmark] = useState(false)
 	const [landmark, setLandmark] = useState('')
 	const [notifPref, setNotifPref] = useState('SMS')
@@ -161,6 +181,7 @@ function CheckoutExperience() {
 			sessionStorage.setItem('bf_last_order', JSON.stringify({ order, cartSnapshot: snapshot }))
 
 			clearCart()
+			clearServerCart().catch(() => {})
 			router.push('/confirmation')
 		} catch {
 			setSubmitError("We couldn't place your order. Please check your connection and try again.")
@@ -178,10 +199,12 @@ function CheckoutExperience() {
 		return `bf-input${touched[field] && fieldErrors[field] ? ' bf-input-error' : ''}`
 	}
 
+	if (!hydrated || !token) return null
+
 	return (
 		<div style={{ minHeight: '100vh', background: 'var(--bf-cream)' }}>
 			{/* ── Header ── */}
-			<header style={{
+			<header className='bf-checkout-header' style={{
 				display: 'flex',
 				alignItems: 'center',
 				justifyContent: 'space-between',

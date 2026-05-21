@@ -4,6 +4,23 @@
 
 ---
 
+## Information Architecture (v2 — implemented)
+
+| Route | Role |
+|-------|------|
+| **/** Home | Curated landing: hero, reorder, category pills → menu anchors, 3 deal teasers, fan favourites |
+| **/menu** | Full catalog, anchor-scroll sections, inline search, list default on mobile |
+| **/deals** | All deals, tag filters, search |
+| **/checkout** etc. | Unchanged flow |
+
+**Navigation:** Home · Menu · Cart · Account (no Deals tab — deals linked from home + desktop nav).
+
+**Global search:** Header (mobile icon / desktop bar) opens full-screen overlay → `/menu?q=`.
+
+**Delivery context:** Header delivery chip (area + ETA), persisted in `localStorage`.
+
+---
+
 ## Implementation Status
 
 | Priority | Feature | Status |

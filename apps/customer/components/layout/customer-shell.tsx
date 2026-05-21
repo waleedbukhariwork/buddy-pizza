@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation'
 import { Logo } from '../ui/logo'
 import { Icons } from '../ui/icon'
 import { CartDrawer } from '../cart/cart-drawer'
+import { DeliveryChip } from './delivery-chip'
 import { useCartStore } from '../../lib/cart-store'
 import { useAuthStore } from '../../lib/auth-store'
 import { rs } from '../../lib/hooks'
 import type { User } from '@shared/index'
 
-// ─── Avatar (initials) ────────────────────────────────────────────────────────
 function AvatarBadge({ name, size = 30 }: { name: string; size?: number }) {
 	const initials = name
 		.trim()
@@ -42,11 +42,9 @@ function AvatarBadge({ name, size = 30 }: { name: string; size?: number }) {
 	)
 }
 
-// ─── User dropdown menu ───────────────────────────────────────────────────────
 function UserMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
 	const [open, setOpen] = useState(false)
 	const ref = useRef<HTMLDivElement>(null)
-
 	const close = useCallback(() => setOpen(false), [])
 
 	useEffect(() => {
@@ -58,7 +56,6 @@ function UserMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
 		return () => document.removeEventListener('pointerdown', onPointerDown)
 	}, [open, close])
 
-	// close on Escape
 	useEffect(() => {
 		if (!open) return
 		function onKey(e: KeyboardEvent) { if (e.key === 'Escape') close() }
@@ -70,8 +67,8 @@ function UserMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
 
 	return (
 		<div ref={ref} style={{ position: 'relative' }}>
-			{/* ── Trigger button ── */}
 			<button
+				type='button'
 				onClick={() => setOpen((v) => !v)}
 				style={{
 					display: 'flex',
@@ -91,181 +88,66 @@ function UserMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
 				<span style={{ fontSize: 13, fontWeight: 700, color: 'var(--bf-ink)', maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
 					{firstName}
 				</span>
-				<svg
-					width={14}
-					height={14}
-					viewBox='0 0 24 24'
-					fill='none'
-					stroke='var(--bf-mute)'
-					strokeWidth={2.2}
-					strokeLinecap='round'
-					strokeLinejoin='round'
-					style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s', flexShrink: 0 }}
-				>
+				<svg width={14} height={14} viewBox='0 0 24 24' fill='none' stroke='var(--bf-mute)' strokeWidth={2.2} strokeLinecap='round' strokeLinejoin='round' style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s', flexShrink: 0 }}>
 					<path d='M6 9l6 6 6-6' />
 				</svg>
 			</button>
-
-			{/* ── Dropdown panel ── */}
 			{open && (
-				<div
-					style={{
-						position: 'absolute',
-						top: 'calc(100% + 10px)',
-						right: 0,
-						width: 228,
-						background: 'var(--bf-paper)',
-						borderRadius: 16,
-						boxShadow: '0 8px 32px rgba(35,31,32,.16), 0 1px 0 rgba(35,31,32,.06)',
-						border: '1px solid var(--bf-line)',
-						overflow: 'hidden',
-						zIndex: 50,
-						animation: 'bf-dropdown-in .18s cubic-bezier(.34,1.56,.64,1) both',
-					}}
-				>
-					{/* User info header */}
-					<div style={{ padding: '16px 16px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+				<div style={{ position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: 228, background: 'var(--bf-paper)', borderRadius: 16, boxShadow: '0 8px 32px rgba(35,31,32,.16)', border: '1px solid var(--bf-line)', overflow: 'hidden', zIndex: 50, animation: 'bf-dropdown-in .18s cubic-bezier(.34,1.56,.64,1) both' }}>
+					<div style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: 12 }}>
 						<AvatarBadge name={user.name || '?'} size={40} />
 						<div style={{ minWidth: 0 }}>
-							<div style={{ fontWeight: 800, fontSize: 14, letterSpacing: '-0.015em', color: 'var(--bf-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-								{user.name}
-							</div>
-							<div style={{ fontSize: 12, color: 'var(--bf-mute)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-								{user.email || user.phone}
-							</div>
+							<div style={{ fontWeight: 800, fontSize: 14, color: 'var(--bf-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</div>
+							<div style={{ fontSize: 12, color: 'var(--bf-mute)', marginTop: 1 }}>{user.email || user.phone}</div>
 						</div>
 					</div>
-
 					<div style={{ height: 1, background: 'var(--bf-line)', margin: '0 12px' }} />
-
-					{/* Menu items */}
 					<div style={{ padding: '6px 0' }}>
 						{[
-							{
-								href: '/account/profile',
-								label: 'My Profile',
-								icon: <svg width={15} height={15} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'><circle cx='12' cy='8' r='4' /><path d='M4 20a8 8 0 0 1 16 0' /></svg>,
-							},
-							{
-								href: '/account/orders',
-								label: 'My Orders',
-								icon: <svg width={15} height={15} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'><path d='M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2' /></svg>,
-							},
+							{ href: '/account/profile', label: 'My Profile', icon: Icons.user },
+							{ href: '/account/orders', label: 'My Orders', icon: Icons.receipt },
 						].map((item) => (
-							<Link
-								key={item.href}
-								href={item.href}
-								onClick={close}
-								style={{
-									display: 'flex',
-									alignItems: 'center',
-									gap: 11,
-									padding: '10px 16px',
-									fontSize: 13.5,
-									fontWeight: 600,
-									color: 'var(--bf-ink)',
-									transition: 'background .1s',
-								}}
-								className='bf-dd-item'
-							>
+							<Link key={item.href} href={item.href} onClick={close} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 16px', fontSize: 13.5, fontWeight: 600, color: 'var(--bf-ink)' }} className='bf-dd-item'>
 								<span style={{ color: 'var(--bf-ink-2)', display: 'flex' }}>{item.icon}</span>
 								{item.label}
 							</Link>
 						))}
 					</div>
-
 					<div style={{ height: 1, background: 'var(--bf-line)', margin: '0 12px' }} />
-
-					{/* Sign out */}
 					<div style={{ padding: '6px 0 8px' }}>
-						<button
-							onClick={() => { close(); onLogout() }}
-							style={{
-								display: 'flex',
-								alignItems: 'center',
-								gap: 11,
-								padding: '10px 16px',
-								fontSize: 13.5,
-								fontWeight: 700,
-								color: 'var(--bf-ember)',
-								background: 'none',
-								border: 'none',
-								cursor: 'pointer',
-								width: '100%',
-								fontFamily: 'var(--bf-font)',
-								transition: 'background .1s',
-							}}
-							className='bf-dd-item-danger'
-						>
-							<svg width={15} height={15} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
-								<path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9' />
-							</svg>
+						<button type='button' onClick={() => { close(); onLogout() }} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 16px', fontSize: 13.5, fontWeight: 700, color: 'var(--bf-ember)', background: 'none', border: 'none', cursor: 'pointer', width: '100%', fontFamily: 'var(--bf-font)' }} className='bf-dd-item-danger'>
 							Sign out
 						</button>
 					</div>
 				</div>
 			)}
-
 			<style>{`
-				@keyframes bf-dropdown-in {
-					from { opacity: 0; transform: scale(.94) translateY(-6px); }
-					to   { opacity: 1; transform: scale(1)  translateY(0); }
-				}
-				.bf-dd-item:hover       { background: var(--bf-cream) !important; }
+				@keyframes bf-dropdown-in { from { opacity: 0; transform: scale(.94) translateY(-6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+				.bf-dd-item:hover { background: var(--bf-cream) !important; }
 				.bf-dd-item-danger:hover { background: rgba(232,67,31,.06) !important; }
 			`}</style>
 		</div>
 	)
 }
 
-// ─── Desktop nav link ─────────────────────────────────────────────────────────
-function NavLink({
-	href,
-	active,
-	children,
-}: {
-	href: string
-	active?: boolean
-	children: React.ReactNode
-}) {
+function NavLink({ href, active, children }: { href: string; active?: boolean; children: React.ReactNode }) {
 	return (
-		<Link
-			href={href}
-			style={{
-				font: '600 14px var(--bf-font)',
-				color: active ? 'var(--bf-ink)' : 'var(--bf-ink-2)',
-				textDecoration: 'none',
-				padding: '6px 0',
-				borderBottom: active
-					? '2px solid var(--bf-ember)'
-					: '2px solid transparent',
-			}}
-		>
+		<Link href={href} style={{ font: '600 14px var(--bf-font)', color: active ? 'var(--bf-ink)' : 'var(--bf-ink-2)', textDecoration: 'none', padding: '6px 0', borderBottom: active ? '2px solid var(--bf-ember)' : '2px solid transparent' }}>
 			{children}
 		</Link>
 	)
 }
 
-// ─── Mobile bottom navigation ─────────────────────────────────────────────────
-function BottomNav({
-	activePage,
-	onCartOpen,
-}: {
-	activePage: string
-	onCartOpen: () => void
-}) {
-	const count = useCartStore((s) =>
-		s.items.reduce((acc, i) => acc + i.quantity, 0),
-	)
+function BottomNav({ activePage, onCartOpen }: { activePage: string; onCartOpen: () => void }) {
+	const count = useCartStore((s) => s.items.reduce((acc, i) => acc + i.quantity, 0))
 	const prevCountRef = useRef(count)
 	const [badgePop, setBadgePop] = useState(false)
 
 	useEffect(() => {
 		if (count > prevCountRef.current) {
 			setBadgePop(false)
-			// force re-trigger the animation class
 			requestAnimationFrame(() => setBadgePop(true))
-			const t = setTimeout(() => setBadgePop(false), 950) // 3 × 0.3s
+			const t = setTimeout(() => setBadgePop(false), 950)
 			return () => clearTimeout(t)
 		}
 		prevCountRef.current = count
@@ -273,40 +155,22 @@ function BottomNav({
 
 	return (
 		<nav className='bf-bottom-nav'>
-			<Link
-				href='/'
-				className={`bf-bottom-nav-tab${activePage === 'home' ? ' active' : ''}`}
-			>
+			<Link href='/' className={`bf-bottom-nav-tab${activePage === 'home' ? ' active' : ''}`}>
 				<span className='bf-nav-icon'>{Icons.home}</span>
 				<span className='bf-nav-label'>Home</span>
 			</Link>
-
-			<Link
-				href='/menu'
-				className={`bf-bottom-nav-tab${activePage === 'menu' ? ' active' : ''}`}
-			>
+			<Link href='/menu' className={`bf-bottom-nav-tab${activePage === 'menu' ? ' active' : ''}`}>
 				<span className='bf-nav-icon'>{Icons.grid}</span>
 				<span className='bf-nav-label'>Menu</span>
 			</Link>
-
-			<button className='bf-bottom-nav-tab' onClick={onCartOpen}>
+			<button type='button' className='bf-bottom-nav-tab' onClick={onCartOpen}>
 				<span className='bf-nav-icon'>
 					{Icons.cart}
-					{count > 0 && (
-						<span
-							className={`bf-nav-badge${badgePop ? ' bf-nav-badge-pop' : ''}`}
-						>
-							{count}
-						</span>
-					)}
+					{count > 0 && <span className={`bf-nav-badge${badgePop ? ' bf-nav-badge-pop' : ''}`}>{count}</span>}
 				</span>
 				<span className='bf-nav-label'>Cart</span>
 			</button>
-
-			<Link
-				href='/account/profile'
-				className={`bf-bottom-nav-tab${activePage === 'profile' || activePage === 'orders' ? ' active' : ''}`}
-			>
+			<Link href='/account/profile' className={`bf-bottom-nav-tab${activePage === 'profile' || activePage === 'orders' ? ' active' : ''}`}>
 				<span className='bf-nav-icon'>{Icons.user}</span>
 				<span className='bf-nav-label'>Account</span>
 			</Link>
@@ -314,11 +178,8 @@ function BottomNav({
 	)
 }
 
-// ─── Persistent cart bar (mobile only, slides up when cart has items) ─────────
 function CartBar({ onOpen }: { onOpen: () => void }) {
-	const count = useCartStore((s) =>
-		s.items.reduce((acc, i) => acc + i.quantity, 0),
-	)
+	const count = useCartStore((s) => s.items.reduce((acc, i) => acc + i.quantity, 0))
 	const total = useCartStore((s) => s.total)
 	const [visible, setVisible] = useState(false)
 	const [animKey, setAnimKey] = useState(0)
@@ -327,36 +188,20 @@ function CartBar({ onOpen }: { onOpen: () => void }) {
 		if (count > 0 && !visible) {
 			setVisible(true)
 			setAnimKey((k) => k + 1)
-		} else if (count === 0) {
-			setVisible(false)
-		}
+		} else if (count === 0) setVisible(false)
 	}, [count, visible])
 
 	if (!visible) return null
 
 	return (
 		<div className='bf-cart-bar'>
-			<button
-				key={animKey}
-				className='bf-cart-bar-btn bf-cart-bar-enter'
-				onClick={onOpen}
-			>
+			<button key={animKey} type='button' className='bf-cart-bar-btn bf-cart-bar-enter' onClick={onOpen}>
 				<div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
 					{Icons.cart}
-					<span style={{ fontWeight: 700, fontSize: 14 }}>
-						{count} {count === 1 ? 'item' : 'items'}
-					</span>
+					<span style={{ fontWeight: 700, fontSize: 14 }}>{count} {count === 1 ? 'item' : 'items'}</span>
 				</div>
 				<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-					<span
-						style={{
-							fontWeight: 800,
-							fontSize: 15,
-							fontFamily: 'var(--bf-mono)',
-						}}
-					>
-						{rs(total)}
-					</span>
+					<span style={{ fontWeight: 800, fontSize: 15, fontFamily: 'var(--bf-mono)' }}>{rs(total)}</span>
 					{Icons.arrow}
 				</div>
 			</button>
@@ -364,20 +209,25 @@ function CartBar({ onOpen }: { onOpen: () => void }) {
 	)
 }
 
-// ─── Customer shell ───────────────────────────────────────────────────────────
-function CustomerShell({
-	children,
-	activePage = 'home',
-}: {
-	children: React.ReactNode
-	activePage?: string
-}) {
-	const items = useCartStore((s) => s.items)
-	const count = items.reduce((s, i) => s + i.quantity, 0)
+function ShellInner({ children, activePage = 'home' }: { children: React.ReactNode; activePage?: string }) {
+	const count = useCartStore((s) => s.items.reduce((s, i) => s + i.quantity, 0))
+	const prevCountRef = useRef(count)
+	const [badgePop, setBadgePop] = useState(false)
+
+	useEffect(() => {
+		if (count > prevCountRef.current) {
+			setBadgePop(false)
+			requestAnimationFrame(() => setBadgePop(true))
+			const t = setTimeout(() => setBadgePop(false), 950)
+			return () => clearTimeout(t)
+		}
+		prevCountRef.current = count
+	}, [count])
+
 	const [cartOpen, setCartOpen] = useState(false)
 	const headerRef = useRef<HTMLElement>(null)
+	const mobileHeaderRef = useRef<HTMLElement>(null)
 	const lastScrollY = useRef(0)
-
 	const router = useRouter()
 	const { user, hydrate, logout } = useAuthStore()
 
@@ -386,19 +236,16 @@ function CustomerShell({
 		router.push('/')
 	}
 
-	useEffect(() => {
-		hydrate()
-	}, [hydrate])
+	useEffect(() => { hydrate() }, [hydrate])
 
 	useEffect(() => {
 		function onScroll() {
 			const y = window.scrollY
 			const delta = y - lastScrollY.current
-			if (!headerRef.current) return
-			if (delta > 10 && y > 80) {
-				headerRef.current.classList.add('bf-header-hidden')
-			} else if (delta < -5) {
-				headerRef.current.classList.remove('bf-header-hidden')
+			for (const el of [headerRef.current, mobileHeaderRef.current]) {
+				if (!el) continue
+				if (delta > 10 && y > 80) el.classList.add('bf-header-hidden')
+				else if (delta < -5) el.classList.remove('bf-header-hidden')
 			}
 			lastScrollY.current = y
 		}
@@ -407,164 +254,87 @@ function CustomerShell({
 	}, [])
 
 	return (
-		<div
-			className='bf-shell-wrap'
-			style={{ minHeight: '100vh', background: 'var(--bf-cream)', display: 'flex', flexDirection: 'column' }}
-		>
-			{/* ── Desktop / tablet header ── */}
-			<header
-				ref={headerRef}
-				className='bf-smart-header'
-				style={{
-					display: 'flex',
-					alignItems: 'center',
-					justifyContent: 'space-between',
-					padding: '18px 56px',
-					borderBottom: '1px solid var(--bf-line)',
-					background: 'var(--bf-cream)',
-					position: 'sticky',
-					top: 0,
-					zIndex: 20,
-				}}
-			>
+		<div className='bf-shell-wrap' style={{ minHeight: '100vh', background: 'var(--bf-cream)', display: 'flex', flexDirection: 'column' }}>
+			<header ref={headerRef} className='bf-smart-header bf-header-desktop'>
 				<Logo size={22} />
-				<nav style={{ display: 'flex', gap: 28 }}>
-					<NavLink href='/' active={activePage === 'home'}>
-						Home
-					</NavLink>
-					<NavLink href='/menu' active={activePage === 'menu'}>
-						Menu
-					</NavLink>
-					<NavLink href='/deals' active={activePage === 'deals'}>
-						Deals
-					</NavLink>
-					<NavLink href='/account/orders' active={activePage === 'orders'}>
-						Track order
-					</NavLink>
+				<nav className='bf-header-nav'>
+					<NavLink href='/' active={activePage === 'home'}>Home</NavLink>
+					<NavLink href='/menu' active={activePage === 'menu'}>Menu</NavLink>
+					<NavLink href='/deals' active={activePage === 'deals'}>Deals</NavLink>
+					<NavLink href='/account/orders' active={activePage === 'orders'}>Track order</NavLink>
 				</nav>
-				<div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-					<button
-						className='bf-btn bf-btn-ghost bf-btn-sm'
-						style={{ display: 'flex', gap: 6 }}
-					>
-						{Icons.pin}{' '}
-						<span style={{ fontWeight: 600 }}>DHA Phase 5</span>
-					</button>
+				<div className='bf-header-right'>
+					<div className='bf-delivery-wrap'>
+						<DeliveryChip />
+					</div>
 					{user ? (
 						<UserMenu user={user} onLogout={handleLogout} />
 					) : (
-						<Link
-							className='bf-btn bf-btn-outline bf-btn-sm'
-							href='/auth/login'
-							style={{ display: 'flex', gap: 6 }}
-						>
+						<Link className='bf-btn bf-btn-outline bf-btn-sm' href='/auth/login' style={{ display: 'flex', gap: 6 }}>
 							{Icons.user} Sign in
 						</Link>
 					)}
-					<button
-						className='bf-btn bf-btn-primary bf-btn-sm'
-						style={{ display: 'flex', gap: 6 }}
-						onClick={() => setCartOpen(true)}
-					>
-						{Icons.cart} Cart · {count}
+					<button type='button' className='bf-btn bf-btn-primary bf-btn-sm' style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setCartOpen(true)}>
+						<span style={{ position: 'relative', display: 'flex' }}>
+							{Icons.cart}
+							{count > 0 && <span className={`bf-nav-badge${badgePop ? ' bf-nav-badge-pop' : ''}`} style={{ top: -6, right: -8 }}>{count}</span>}
+						</span>
+						Cart
 					</button>
 				</div>
 			</header>
 
-			{/* ── Page content — flex: 1 pushes footer to bottom regardless of content height ── */}
+			<header ref={mobileHeaderRef} className='bf-smart-header bf-header-mobile'>
+				<Logo size={20} />
+				<div className='bf-header-mobile-center'>
+					<DeliveryChip compact />
+				</div>
+				<div className='bf-header-actions'>
+					<button type='button' className='bf-btn bf-btn-primary bf-btn-sm bf-header-search-btn' onClick={() => setCartOpen(true)} aria-label='Cart'>
+						<span style={{ position: 'relative', display: 'flex' }}>
+							{Icons.cart}
+							{count > 0 && <span className={`bf-nav-badge${badgePop ? ' bf-nav-badge-pop' : ''}`} style={{ top: -6, right: -6 }}>{count}</span>}
+						</span>
+					</button>
+				</div>
+			</header>
+
 			<div style={{ flex: 1 }}>{children}</div>
 
-			{/* ── Overlays ── */}
 			<CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
 			<CartBar onOpen={() => setCartOpen(true)} />
 			<BottomNav activePage={activePage} onCartOpen={() => setCartOpen(true)} />
 
-			{/* ── Footer ── */}
-			<section
-				style={{
-					padding: '40px 56px',
-					background: 'var(--bf-ink)',
-					color: '#fff',
-				}}
-			>
-				<div
-					style={{
-						display: 'grid',
-						gridTemplateColumns: 'repeat(4, 1fr)',
-						gap: 24,
-						maxWidth: 1280,
-						margin: '0 auto',
-					}}
-				>
+			<section className='bf-footer-trust'>
+				<div className='bf-footer-trust-grid'>
 					{[
 						{ k: '30 min', v: "Hot-out-of-oven delivery, or it's on us." },
 						{ k: 'One kitchen', v: 'No marketplace. We cook, we deliver.' },
-						{
-							k: 'COD or card',
-							v: 'Pay how you like. Card support coming soon.',
-						},
-						{
-							k: 'Real photos',
-							v: 'What you see is what shows up at your door.',
-						},
+						{ k: 'COD', v: 'Pay cash on delivery. Card support coming soon.' },
+						{ k: 'Real photos', v: 'What you see is what shows up at your door.' },
 					].map((t, i) => (
 						<div key={i}>
-							<div
-								style={{
-									fontWeight: 800,
-									fontSize: 28,
-									color: 'var(--bf-amber)',
-									letterSpacing: '-0.022em',
-								}}
-							>
-								{t.k}
-							</div>
-							<div
-								style={{
-									fontSize: 14,
-									color: 'rgba(255,255,255,.7)',
-									marginTop: 6,
-								}}
-							>
-								{t.v}
-							</div>
+							<div style={{ fontWeight: 800, fontSize: 28, color: 'var(--bf-amber)', letterSpacing: '-0.022em' }}>{t.k}</div>
+							<div style={{ fontSize: 14, color: 'rgba(255,255,255,.7)', marginTop: 6 }}>{t.v}</div>
 						</div>
 					))}
 				</div>
 			</section>
-			<footer
-				style={{
-					padding: '32px 56px',
-					display: 'flex',
-					justifyContent: 'space-between',
-					alignItems: 'center',
-					background: 'var(--bf-cream-2)',
-				}}
-			>
+			<footer className='bf-footer-bar'>
 				<Logo size={18} />
-				<div
-					style={{
-						display: 'flex',
-						gap: 24,
-						font: '500 13px var(--bf-font)',
-						color: 'var(--bf-ink-2)',
-					}}
-				>
+				<div className='bf-footer-links'>
 					<span>About</span>
-					<span>Careers</span>
 					<span>Help</span>
 					<span>Privacy</span>
-					<span>Terms</span>
 				</div>
-				<div
-					className='bf-mono'
-					style={{ fontSize: 11, color: 'var(--bf-mute)' }}
-				>
-					© 2026 BUDDY FEAST · LAHORE
-				</div>
+				<div className='bf-mono' style={{ fontSize: 11, color: 'var(--bf-mute)' }}>© 2026 BUDDY FEAST · LAHORE</div>
 			</footer>
 		</div>
 	)
+}
+
+function CustomerShell(props: { children: React.ReactNode; activePage?: string }) {
+	return <ShellInner {...props} />
 }
 
 export { CustomerShell }

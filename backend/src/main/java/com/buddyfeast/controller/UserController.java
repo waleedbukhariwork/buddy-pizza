@@ -54,8 +54,11 @@ public class UserController {
     }
 
     private User resolveUser(Authentication authentication) {
-        String phone = authentication.getName();
-        return userRepository.findByPhone(phone)
+        String identifier = authentication.getName();
+        boolean isEmail = identifier.contains("@");
+        return (isEmail
+                ? userRepository.findByEmail(identifier)
+                : userRepository.findByPhone(identifier))
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 

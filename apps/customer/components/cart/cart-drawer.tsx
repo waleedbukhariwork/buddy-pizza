@@ -149,21 +149,13 @@ function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 	if (!open) return null
 	return (
-		<div
-			style={{ position: 'fixed', inset: 0, background: 'rgba(35,31,32,.45)', zIndex: 50, display: 'flex' }}
-			onClick={onClose}
-		>
-			<div style={{ flex: 1 }} />
+		<div className='bf-cart-drawer-root' onClick={onClose} role='presentation'>
+			<div className='bf-cart-drawer-spacer' aria-hidden='true' />
 			<aside
-				style={{
-					width: 460,
-					background: 'var(--bf-paper)',
-					display: 'flex',
-					flexDirection: 'column',
-					boxShadow: 'var(--bf-shadow-lg)',
-					maxWidth: '100vw',
-				}}
+				className='bf-cart-drawer-panel bf-sheet-enter'
 				onClick={(e) => e.stopPropagation()}
+				role='dialog'
+				aria-label='Your cart'
 			>
 				{/* ── Header ── */}
 				<div style={{ padding: '8px 28px 0' }}>

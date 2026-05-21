@@ -18,6 +18,12 @@ public class ProductDTO {
     private Double priceSmall;
     private Double priceMedium;
     private Double priceLarge;
+    private String labelSmall;
+    private String labelMedium;
+    private String labelLarge;
+    private Double discountPct;
+    private Double discountAmount;
+    private String sizesJson;
     private Boolean isAvailable;
     private Boolean isHot;
     private Boolean hasSizes;

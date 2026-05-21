@@ -1,14 +1,57 @@
 'use client'
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Logo } from '../ui/logo'
 import { apiClient } from '../../lib/api-client'
 import { useAuthStore } from '../../lib/auth-store'
-import type { AuthResponse } from '@shared/index'
+import type { AuthResponse, User } from '@shared/index'
 
-// ─── Auth shell (minimal, focused) ───────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface InitiateResponse {
+	identifier: string
+	identifierType: string
+	message: string
+}
+
+// ─── Validation helpers ───────────────────────────────────────────────────────
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_RE = /^(\+92|92|0)?3[0-9]{9}$/
+
+function detectType(value: string): 'email' | 'phone' | 'unknown' {
+	if (value.includes('@')) return 'email'
+	const stripped = value.replace(/[\s\-]/g, '')
+	if (/^[0-9+]/.test(stripped)) return 'phone'
+	return 'unknown'
+}
+
+function isValidEmail(v: string) {
+	return EMAIL_RE.test(v.trim())
+}
+
+function isValidPhone(v: string) {
+	return PHONE_RE.test(v.trim().replace(/[\s\-]/g, ''))
+}
+
+function isValidIdentifier(v: string) {
+	const t = detectType(v)
+	if (t === 'email') return isValidEmail(v)
+	if (t === 'phone') return isValidPhone(v)
+	return false
+}
+
+function maskIdentifier(identifier: string, type: string) {
+	if (type === 'EMAIL') {
+		const [local, domain] = identifier.split('@')
+		return local.slice(0, 2) + '****@' + domain
+	}
+	return identifier.slice(0, 4) + '****' + identifier.slice(-2)
+}
+
+// ─── Auth shell ───────────────────────────────────────────────────────────────
+
 function AuthShell({ children }: { children: React.ReactNode }) {
 	return (
 		<div
@@ -76,24 +119,13 @@ function AuthShell({ children }: { children: React.ReactNode }) {
 	)
 }
 
-// ─── Auth panel (left decorative side) ───────────────────────────────────────
+// ─── Decorative left panel ────────────────────────────────────────────────────
+
 function AuthPanel() {
 	const items = [
-		{
-			icon: '🍕',
-			label: 'Wood-fired pizzas',
-			sub: 'Neapolitan style, under 90 seconds',
-		},
-		{
-			icon: '🚴',
-			label: 'Delivery in 25 min',
-			sub: '3.2 km avg — your food stays hot',
-		},
-		{
-			icon: '⭐',
-			label: '4.9 · 2,400+ reviews',
-			sub: "Multan's favourite pizza joint",
-		},
+		{ icon: '🍕', label: 'Wood-fired pizzas', sub: 'Neapolitan style, under 90 seconds' },
+		{ icon: '🚴', label: 'Delivery in 25 min', sub: '3.2 km avg — your food stays hot' },
+		{ icon: '⭐', label: '4.9 · 2,400+ reviews', sub: "Multan's favourite pizza joint" },
 	]
 	return (
 		<div
@@ -112,131 +144,57 @@ function AuthPanel() {
 		>
 			<div
 				style={{
-					position: 'absolute',
-					top: -60,
-					right: -60,
-					width: 200,
-					height: 200,
-					borderRadius: '50%',
-					background: 'rgba(232,67,31,.18)',
-					pointerEvents: 'none',
+					position: 'absolute', top: -60, right: -60,
+					width: 200, height: 200, borderRadius: '50%',
+					background: 'rgba(232,67,31,.18)', pointerEvents: 'none',
 				}}
 			/>
 			<div
 				style={{
-					position: 'absolute',
-					bottom: -40,
-					left: -40,
-					width: 160,
-					height: 160,
-					borderRadius: '50%',
-					background: 'rgba(255,182,39,.14)',
-					pointerEvents: 'none',
+					position: 'absolute', bottom: -40, left: -40,
+					width: 160, height: 160, borderRadius: '50%',
+					background: 'rgba(255,182,39,.14)', pointerEvents: 'none',
 				}}
 			/>
 			<div>
-				<p
-					style={{
-						fontFamily: 'var(--bf-mono)',
-						fontSize: 11,
-						fontWeight: 600,
-						letterSpacing: '0.14em',
-						textTransform: 'uppercase',
-						color: 'var(--bf-ember)',
-						marginBottom: 12,
-					}}
-				>
+				<p style={{
+					fontFamily: 'var(--bf-mono)', fontSize: 11, fontWeight: 600,
+					letterSpacing: '0.14em', textTransform: 'uppercase',
+					color: 'var(--bf-ember)', marginBottom: 12,
+				}}>
 					Buddy Feast
 				</p>
-				<p
-					style={{
-						fontSize: 28,
-						fontWeight: 900,
-						letterSpacing: '-0.03em',
-						color: '#fff',
-						lineHeight: 1.2,
-					}}
-				>
-					Great pizza,
-					<br />
-					fast delivery.
+				<p style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', lineHeight: 1.2 }}>
+					Great pizza,<br />fast delivery.
 				</p>
-				<p
-					style={{
-						marginTop: 12,
-						fontSize: 14,
-						color: 'rgba(255,255,255,.55)',
-						lineHeight: 1.6,
-					}}
-				>
-					Sign in to track your orders, save your address, and check out faster
-					every time.
+				<p style={{ marginTop: 12, fontSize: 14, color: 'rgba(255,255,255,.55)', lineHeight: 1.6 }}>
+					Sign in to track your orders, save your address, and check out faster every time.
 				</p>
 			</div>
-			<div
-				style={{ display: 'flex', flexDirection: 'column', gap: 20, flex: 1 }}
-			>
+			<div style={{ display: 'flex', flexDirection: 'column', gap: 20, flex: 1 }}>
 				{items.map((it) => (
-					<div
-						key={it.label}
-						style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}
-					>
-						<div style={{ fontSize: 22, lineHeight: 1, marginTop: 2 }}>
-							{it.icon}
-						</div>
+					<div key={it.label} style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+						<div style={{ fontSize: 22, lineHeight: 1, marginTop: 2 }}>{it.icon}</div>
 						<div>
-							<p
-								style={{
-									fontSize: 13.5,
-									fontWeight: 700,
-									color: '#fff',
-									letterSpacing: '-0.01em',
-								}}
-							>
+							<p style={{ fontSize: 13.5, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em' }}>
 								{it.label}
 							</p>
-							<p
-								style={{
-									fontSize: 12,
-									color: 'rgba(255,255,255,.5)',
-									marginTop: 2,
-								}}
-							>
-								{it.sub}
-							</p>
+							<p style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 2 }}>{it.sub}</p>
 						</div>
 					</div>
 				))}
 			</div>
-			<div
-				style={{
-					padding: '16px 18px',
-					background: 'rgba(255,255,255,.07)',
-					borderRadius: 12,
-					border: '1px solid rgba(255,255,255,.1)',
-				}}
-			>
-				<p
-					style={{
-						fontSize: 13,
-						color: 'rgba(255,255,255,.75)',
-						fontStyle: 'italic',
-						lineHeight: 1.5,
-					}}
-				>
-					"Honestly the fastest delivery in Multan and the dough is perfect
-					every time."
+			<div style={{
+				padding: '16px 18px', background: 'rgba(255,255,255,.07)',
+				borderRadius: 12, border: '1px solid rgba(255,255,255,.1)',
+			}}>
+				<p style={{ fontSize: 13, color: 'rgba(255,255,255,.75)', fontStyle: 'italic', lineHeight: 1.5 }}>
+					"Honestly the fastest delivery in Multan and the dough is perfect every time."
 				</p>
-				<p
-					style={{
-						fontSize: 11.5,
-						fontWeight: 700,
-						color: 'rgba(255,255,255,.4)',
-						marginTop: 8,
-						fontFamily: 'var(--bf-mono)',
-						letterSpacing: '0.06em',
-					}}
-				>
+				<p style={{
+					fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,.4)',
+					marginTop: 8, fontFamily: 'var(--bf-mono)', letterSpacing: '0.06em',
+				}}>
 					— Ayesha M., Multan
 				</p>
 			</div>
@@ -244,67 +202,13 @@ function AuthPanel() {
 	)
 }
 
-// ─── Sign In ──────────────────────────────────────────────────────────────────
-function AuthSignIn() {
-	const router = useRouter()
-	const { setToken, setUser } = useAuthStore()
+// ─── Shared sub-components ────────────────────────────────────────────────────
 
-	const [phoneOrEmail, setPhoneOrEmail] = useState('')
-	const [password, setPassword] = useState('')
-	const [showPw, setShowPw] = useState(false)
-	const [remember, setRemember] = useState(false)
-	const [isLoading, setIsLoading] = useState(false)
-	const [error, setError] = useState<string | null>(null)
-	const [fieldError, setFieldError] = useState<string | null>(null)
-
-	function validateIdentifier() {
-		if (!phoneOrEmail.trim()) {
-			setFieldError('Please enter your phone or email')
-		} else {
-			setFieldError(null)
-		}
-	}
-
-	async function handleSubmit(e: React.FormEvent) {
-		e.preventDefault()
-		setError(null)
-		setIsLoading(true)
-		try {
-			const { data } = await apiClient.post<AuthResponse>('/v1/auth/customer/login', {
-				phoneOrEmail,
-				password,
-			})
-			if (data.token) {
-				localStorage.setItem('token', data.token)
-				if (data.user) localStorage.setItem('user', JSON.stringify(data.user))
-				setToken(data.token)
-				if (data.user) setUser(data.user)
-				router.push('/')
-			}
-		} catch (err: unknown) {
-			const status = (err as { response?: { status?: number } })?.response?.status
-			if (status === 401 || status === 403) {
-				setError('Incorrect phone/email or password.')
-			} else {
-				setError('Something went wrong. Please try again.')
-			}
-		} finally {
-			setIsLoading(false)
-		}
-	}
-
-	const EyeIcon = () => (
-		<svg
-			width={18}
-			height={18}
-			viewBox='0 0 24 24'
-			fill='none'
-			stroke='currentColor'
-			strokeWidth={1.8}
-			strokeLinecap='round'
-			strokeLinejoin='round'
-		>
-			{showPw ? (
+function EyeIcon({ visible }: { visible: boolean }) {
+	return (
+		<svg width={18} height={18} viewBox='0 0 24 24' fill='none'
+			stroke='currentColor' strokeWidth={1.8} strokeLinecap='round' strokeLinejoin='round'>
+			{visible ? (
 				<>
 					<path d='M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94' />
 					<path d='M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19' />
@@ -318,206 +222,435 @@ function AuthSignIn() {
 			)}
 		</svg>
 	)
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+	return (
+		<label style={{
+			display: 'block', fontSize: 11.5, fontWeight: 700,
+			color: 'var(--bf-ink-2)', marginBottom: 6, letterSpacing: '-0.01em',
+		}}>
+			{children}
+		</label>
+	)
+}
+
+function ErrorBanner({ message }: { message: string }) {
+	return (
+		<div style={{
+			padding: '10px 14px', borderRadius: 10,
+			background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)',
+			color: 'var(--bf-error)', fontSize: 13, fontWeight: 600,
+		}}>
+			{message}
+		</div>
+	)
+}
+
+function TabSwitcher({ active }: { active: 'signin' | 'signup' }) {
+	return (
+		<div style={{
+			display: 'flex', background: 'var(--bf-cream)',
+			borderRadius: 10, padding: 4, marginBottom: 32, gap: 4,
+		}}>
+			{(['signin', 'signup'] as const).map((tab) => {
+				const isActive = tab === active
+				const label = tab === 'signin' ? 'Sign in' : 'Create account'
+				const href = tab === 'signin' ? '/auth/login' : '/auth/register'
+				return isActive ? (
+					<div key={tab} style={{
+						flex: 1, background: 'var(--bf-paper)', borderRadius: 8,
+						padding: '8px 0', textAlign: 'center', fontSize: 13,
+						fontWeight: 700, color: 'var(--bf-ink)',
+						boxShadow: '0 1px 4px rgba(35,31,32,.1)', cursor: 'default',
+					}}>
+						{label}
+					</div>
+				) : (
+					<Link key={tab} href={href} style={{
+						flex: 1, borderRadius: 8, padding: '8px 0', textAlign: 'center',
+						fontSize: 13, fontWeight: 600, color: 'var(--bf-mute)', display: 'block',
+					}}>
+						{label}
+					</Link>
+				)
+			})}
+		</div>
+	)
+}
+
+// ─── OTP step ─────────────────────────────────────────────────────────────────
+
+interface OtpStepProps {
+	identifier: string
+	identifierType: string
+	onBack: () => void
+	onSuccess: (token: string, user: User | undefined) => void
+}
+
+function OtpStep({ identifier, identifierType, onBack, onSuccess }: OtpStepProps) {
+	const [digits, setDigits] = useState<string[]>(Array(6).fill(''))
+	const [timeLeft, setTimeLeft] = useState(120)
+	const [canResend, setCanResend] = useState(false)
+	const [isLoading, setIsLoading] = useState(false)
+	const [isResending, setIsResending] = useState(false)
+	const [error, setError] = useState<string | null>(null)
+	const [resendCount, setResendCount] = useState(0)
+	const inputRefs = useRef<(HTMLInputElement | null)[]>([null, null, null, null, null, null])
+
+	// Countdown timer
+	useEffect(() => {
+		if (timeLeft <= 0) { setCanResend(true); return }
+		const t = setTimeout(() => setTimeLeft((n) => n - 1), 1000)
+		return () => clearTimeout(t)
+	}, [timeLeft])
+
+	function formatTime(s: number) {
+		return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+	}
+
+	function handleDigitInput(index: number, value: string) {
+		const digit = value.replace(/\D/g, '').slice(-1)
+		const next = [...digits]
+		next[index] = digit
+		setDigits(next)
+		setError(null)
+		if (digit && index < 5) inputRefs.current[index + 1]?.focus()
+		if (digit && index === 5 && next.every((d) => d)) {
+			submitOtp(next.join(''))
+		}
+	}
+
+	function handleKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
+		if (e.key === 'Backspace') {
+			if (digits[index]) {
+				const next = [...digits]
+				next[index] = ''
+				setDigits(next)
+			} else if (index > 0) {
+				inputRefs.current[index - 1]?.focus()
+			}
+		} else if (e.key === 'ArrowLeft' && index > 0) {
+			inputRefs.current[index - 1]?.focus()
+		} else if (e.key === 'ArrowRight' && index < 5) {
+			inputRefs.current[index + 1]?.focus()
+		}
+	}
+
+	function handlePaste(e: React.ClipboardEvent) {
+		e.preventDefault()
+		const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+		if (pasted.length === 6) {
+			setDigits(pasted.split(''))
+			inputRefs.current[5]?.focus()
+			submitOtp(pasted)
+		}
+	}
+
+	async function submitOtp(code: string) {
+		setIsLoading(true)
+		setError(null)
+		try {
+			const { data } = await apiClient.post<AuthResponse>('/v1/auth/customer/verify-otp', {
+				identifier,
+				code,
+			})
+			if (data.token) {
+				localStorage.setItem('token', data.token)
+				if (data.user) localStorage.setItem('user', JSON.stringify(data.user))
+				onSuccess(data.token, data.user)
+			}
+		} catch (err: unknown) {
+			const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+			setError(msg || 'Invalid code. Please try again.')
+			setDigits(Array(6).fill(''))
+			setTimeout(() => inputRefs.current[0]?.focus(), 50)
+		} finally {
+			setIsLoading(false)
+		}
+	}
+
+	async function handleResend() {
+		if (!canResend || resendCount >= 3 || isResending) return
+		setIsResending(true)
+		setError(null)
+		try {
+			await apiClient.post('/v1/auth/customer/resend-otp', { identifier })
+			setTimeLeft(120)
+			setCanResend(false)
+			setResendCount((c) => c + 1)
+			setDigits(Array(6).fill(''))
+			setTimeout(() => inputRefs.current[0]?.focus(), 50)
+		} catch (err: unknown) {
+			const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+			setError(msg || 'Failed to resend code. Please try again.')
+		} finally {
+			setIsResending(false)
+		}
+	}
+
+	const allFilled = digits.every((d) => d !== '')
+	const masked = maskIdentifier(identifier, identifierType)
+
+	return (
+		<div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+			{/* Back */}
+			<button
+				type='button'
+				onClick={onBack}
+				style={{
+					display: 'flex', alignItems: 'center', gap: 6,
+					background: 'none', border: 'none', cursor: 'pointer',
+					color: 'var(--bf-mute)', fontSize: 13, fontWeight: 600,
+					padding: 0, marginBottom: 28,
+				}}
+			>
+				<svg width={16} height={16} viewBox='0 0 24 24' fill='none'
+					stroke='currentColor' strokeWidth={2.2} strokeLinecap='round' strokeLinejoin='round'>
+					<path d='M19 12H5M11 6l-6 6 6 6' />
+				</svg>
+				Back
+			</button>
+
+			{/* Heading */}
+			<p style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--bf-ink)', marginBottom: 6 }}>
+				Verify your account
+			</p>
+			<p style={{ fontSize: 13.5, color: 'var(--bf-mute)', marginBottom: 28, lineHeight: 1.5 }}>
+				We sent a 6-digit code to{' '}
+				<span style={{ fontWeight: 700, color: 'var(--bf-ink-2)' }}>{masked}</span>
+			</p>
+
+			{/* OTP digit boxes */}
+			<div
+				onPaste={handlePaste}
+				style={{ display: 'flex', gap: 10, marginBottom: 8, justifyContent: 'space-between' }}
+			>
+				{digits.map((digit, i) => (
+					<input
+						key={i}
+						ref={(el) => { inputRefs.current[i] = el }}
+						type='text'
+						inputMode='numeric'
+						maxLength={1}
+						value={digit}
+						autoFocus={i === 0}
+						disabled={isLoading}
+						onChange={(e) => handleDigitInput(i, e.target.value)}
+						onKeyDown={(e) => handleKeyDown(i, e)}
+						style={{
+							width: 52, height: 60,
+							textAlign: 'center',
+							fontSize: 22, fontWeight: 800,
+							fontFamily: 'var(--bf-mono)',
+							borderRadius: 12,
+							border: `2px solid ${
+								error
+									? 'var(--bf-error)'
+									: digit
+									? 'var(--bf-ember)'
+									: 'var(--bf-line-2)'
+							}`,
+							background: digit ? 'rgba(232,67,31,.04)' : 'var(--bf-paper)',
+							color: 'var(--bf-ink)',
+							outline: 'none',
+							transition: 'border-color .15s, background .15s',
+							caretColor: 'var(--bf-ember)',
+							cursor: isLoading ? 'not-allowed' : 'text',
+						}}
+						onFocus={(e) => { e.target.style.borderColor = error ? 'var(--bf-error)' : 'var(--bf-ember)' }}
+						onBlur={(e) => {
+							if (!e.target.value) e.target.style.borderColor = 'var(--bf-line-2)'
+						}}
+					/>
+				))}
+			</div>
+
+			{/* Error */}
+			{error && (
+				<div style={{ marginBottom: 16 }}>
+					<ErrorBanner message={error} />
+				</div>
+			)}
+
+			{/* Verify button (shown when digits filled but not auto-submitted) */}
+			{allFilled && !isLoading && (
+				<button
+					className='bf-btn bf-btn-primary bf-btn-lg'
+					onClick={() => submitOtp(digits.join(''))}
+					style={{ width: '100%', marginBottom: 16, fontSize: 15, padding: '14px 0', borderRadius: 12 }}
+				>
+					Verify code
+					<svg width={18} height={18} viewBox='0 0 24 24' fill='none'
+						stroke='currentColor' strokeWidth={2.2} strokeLinecap='round' strokeLinejoin='round'>
+						<path d='M5 12h14M13 6l6 6-6 6' />
+					</svg>
+				</button>
+			)}
+
+			{isLoading && (
+				<div style={{
+					padding: '14px 0', borderRadius: 12, marginBottom: 16,
+					background: 'var(--bf-cream)', textAlign: 'center',
+					fontSize: 13.5, color: 'var(--bf-mute)', fontWeight: 600,
+				}}>
+					Verifying…
+				</div>
+			)}
+
+			{/* Resend */}
+			<div style={{ textAlign: 'center', marginTop: 4 }}>
+				{!canResend ? (
+					<p style={{ fontSize: 13, color: 'var(--bf-mute)' }}>
+						Resend code in{' '}
+						<span style={{ fontFamily: 'var(--bf-mono)', fontWeight: 700, color: 'var(--bf-ink-2)' }}>
+							{formatTime(timeLeft)}
+						</span>
+					</p>
+				) : resendCount >= 3 ? (
+					<p style={{ fontSize: 13, color: 'var(--bf-mute)' }}>
+						Max resends reached. Please{' '}
+						<button type='button' onClick={onBack}
+							style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--bf-ember)', fontWeight: 700, fontSize: 13, padding: 0 }}>
+							start over
+						</button>
+					</p>
+				) : (
+					<button
+						type='button'
+						onClick={handleResend}
+						disabled={isResending}
+						style={{
+							background: 'none', border: 'none', cursor: isResending ? 'not-allowed' : 'pointer',
+							color: 'var(--bf-ember)', fontWeight: 700, fontSize: 13, padding: 0,
+							opacity: isResending ? 0.6 : 1,
+						}}
+					>
+						{isResending ? 'Sending…' : 'Resend code'}
+					</button>
+				)}
+			</div>
+		</div>
+	)
+}
+
+// ─── Sign In ──────────────────────────────────────────────────────────────────
+
+function AuthSignIn() {
+	const router = useRouter()
+	const searchParams = useSearchParams()
+	const { setToken, setUser } = useAuthStore()
+
+	const [phoneOrEmail, setPhoneOrEmail] = useState('')
+	const [password, setPassword] = useState('')
+	const [showPw, setShowPw] = useState(false)
+	const [isLoading, setIsLoading] = useState(false)
+	const [error, setError] = useState<string | null>(null)
+
+	async function handleSubmit(e: React.FormEvent) {
+		e.preventDefault()
+		setError(null)
+		setIsLoading(true)
+		try {
+			const { data } = await apiClient.post<AuthResponse>('/v1/auth/customer/login', {
+				phoneOrEmail: phoneOrEmail.trim(),
+				password,
+			})
+			if (data.token) {
+				localStorage.setItem('token', data.token)
+				if (data.user) localStorage.setItem('user', JSON.stringify(data.user))
+				setToken(data.token)
+				if (data.user) setUser(data.user)
+				const redirect = searchParams.get('redirect') ?? '/'
+				router.push(redirect)
+			}
+		} catch (err: unknown) {
+			const status = (err as { response?: { status?: number } })?.response?.status
+			const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+			if (msg === 'UNVERIFIED') {
+				setError('Your account is not verified yet. Please sign up again to complete verification.')
+			} else if (status === 401) {
+				setError('Incorrect password.')
+			} else if (status === 404) {
+				setError('No account found with that phone or email.')
+			} else {
+				setError(msg || 'Something went wrong. Please try again.')
+			}
+		} finally {
+			setIsLoading(false)
+		}
+	}
 
 	return (
 		<AuthShell>
-			<div
-				style={{
-					width: '100%',
-					maxWidth: 900,
-					display: 'grid',
-					gridTemplateColumns: '1fr 1fr',
-					gap: 0,
-					background: 'var(--bf-paper)',
-					borderRadius: 20,
-					overflow: 'hidden',
-					boxShadow: '0 24px 60px rgba(35,31,32,.14)',
-				}}
-			>
-				<div style={{ padding: 40 }}>
+			<div className='bf-auth-grid' style={{
+				width: '100%', maxWidth: 900,
+				display: 'grid', gridTemplateColumns: '1fr 1fr',
+				background: 'var(--bf-paper)', borderRadius: 20, overflow: 'hidden',
+				boxShadow: '0 24px 60px rgba(35,31,32,.14)',
+			}}>
+				<div className='bf-auth-panel-col' style={{ padding: 40 }}>
 					<AuthPanel />
 				</div>
 				<form
 					onSubmit={handleSubmit}
+					className='bf-auth-form-col'
 					style={{
-						padding: '48px 48px',
-						display: 'flex',
-						flexDirection: 'column',
-						justifyContent: 'center',
-						borderLeft: '1px solid var(--bf-line)',
+						padding: '48px 48px', display: 'flex', flexDirection: 'column',
+						justifyContent: 'center', borderLeft: '1px solid var(--bf-line)',
 					}}
 				>
-					<div
-						style={{
-							display: 'flex',
-							background: 'var(--bf-cream)',
-							borderRadius: 10,
-							padding: 4,
-							marginBottom: 36,
-							gap: 4,
-						}}
-					>
-						<div
-							style={{
-								flex: 1,
-								background: 'var(--bf-paper)',
-								borderRadius: 8,
-								padding: '8px 0',
-								textAlign: 'center',
-								fontSize: 13,
-								fontWeight: 700,
-								color: 'var(--bf-ink)',
-								boxShadow: '0 1px 4px rgba(35,31,32,.1)',
-								cursor: 'default',
-							}}
-						>
-							Sign in
-						</div>
-						<Link
-							href='/auth/register'
-							style={{
-								flex: 1,
-								borderRadius: 8,
-								padding: '8px 0',
-								textAlign: 'center',
-								fontSize: 13,
-								fontWeight: 600,
-								color: 'var(--bf-mute)',
-								display: 'block',
-							}}
-						>
-							Create account
-						</Link>
-					</div>
-					<p
-						style={{
-							fontSize: 22,
-							fontWeight: 900,
-							letterSpacing: '-0.03em',
-							color: 'var(--bf-ink)',
-							marginBottom: 4,
-						}}
-					>
+					<TabSwitcher active='signin' />
+
+					<p style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--bf-ink)', marginBottom: 4 }}>
 						Welcome back
 					</p>
-					<p
-						style={{
-							fontSize: 13.5,
-							color: 'var(--bf-mute)',
-							marginBottom: 28,
-							lineHeight: 1.5,
-						}}
-					>
+					<p style={{ fontSize: 13.5, color: 'var(--bf-mute)', marginBottom: 28, lineHeight: 1.5 }}>
 						Good to see you again. Let's get your order going.
 					</p>
+
 					<div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+						{/* Identifier */}
 						<div>
-							<label
-								style={{
-									display: 'block',
-									fontSize: 11.5,
-									fontWeight: 700,
-									color: 'var(--bf-ink-2)',
-									marginBottom: 6,
-									letterSpacing: '-0.01em',
-								}}
-							>
-								Phone or email
-							</label>
+							<FieldLabel>Phone or email</FieldLabel>
 							<div style={{ position: 'relative' }}>
-								<span
-									style={{
-										position: 'absolute',
-										left: 14,
-										top: '50%',
-										transform: 'translateY(-50%)',
-										color: 'var(--bf-mute)',
-										display: 'flex',
-										pointerEvents: 'none',
-									}}
-								>
-									<svg
-										width={16}
-										height={16}
-										viewBox='0 0 24 24'
-										fill='none'
-										stroke='currentColor'
-										strokeWidth={2}
-										strokeLinecap='round'
-										strokeLinejoin='round'
-									>
+								<span style={{
+									position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+									color: 'var(--bf-mute)', display: 'flex', pointerEvents: 'none',
+								}}>
+									<svg width={16} height={16} viewBox='0 0 24 24' fill='none'
+										stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
 										<path d='M5 4h4l2 5-3 2a11 11 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z' />
 									</svg>
 								</span>
 								<input
 									className='bf-input'
-									style={{ paddingLeft: 40, borderColor: fieldError ? 'var(--bf-error)' : undefined }}
-									placeholder='923000000000'
+									style={{ paddingLeft: 40 }}
+									placeholder='03001234567 or email@example.com'
 									value={phoneOrEmail}
-									onChange={(e) => { setPhoneOrEmail(e.target.value); setFieldError(null) }}
-									onBlur={validateIdentifier}
+									onChange={(e) => { setPhoneOrEmail(e.target.value); setError(null) }}
 									required
 									autoComplete='username'
+									autoFocus
 								/>
-								{fieldError && (
-									<div style={{ marginTop: 5, fontSize: 12, color: 'var(--bf-error)', fontWeight: 600 }}>
-										{fieldError}
-									</div>
-								)}
 							</div>
 						</div>
+
+						{/* Password */}
 						<div>
-							<div
-								style={{
-									display: 'flex',
-									justifyContent: 'space-between',
-									alignItems: 'center',
-									marginBottom: 6,
-								}}
-							>
-								<label
-									style={{
-										fontSize: 11.5,
-										fontWeight: 700,
-										color: 'var(--bf-ink-2)',
-										letterSpacing: '-0.01em',
-									}}
-								>
-									Password
-								</label>
-								<Link
-									href='#'
-									style={{
-										fontSize: 12,
-										fontWeight: 600,
-										color: 'var(--bf-ember)',
-									}}
-								>
+							<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+								<FieldLabel>Password</FieldLabel>
+								<Link href='#' style={{ fontSize: 12, fontWeight: 600, color: 'var(--bf-ember)' }}>
 									Forgot?
 								</Link>
 							</div>
 							<div style={{ position: 'relative' }}>
-								<span
-									style={{
-										position: 'absolute',
-										left: 14,
-										top: '50%',
-										transform: 'translateY(-50%)',
-										color: 'var(--bf-mute)',
-										display: 'flex',
-										pointerEvents: 'none',
-									}}
-								>
-									<svg
-										width={16}
-										height={16}
-										viewBox='0 0 24 24'
-										fill='none'
-										stroke='currentColor'
-										strokeWidth={2}
-										strokeLinecap='round'
-										strokeLinejoin='round'
-									>
+								<span style={{
+									position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+									color: 'var(--bf-mute)', display: 'flex', pointerEvents: 'none',
+								}}>
+									<svg width={16} height={16} viewBox='0 0 24 24' fill='none'
+										stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
 										<rect x='3' y='11' width='18' height='11' rx='2' />
 										<path d='M7 11V7a5 5 0 0 1 10 0v4' />
 									</svg>
@@ -526,6 +659,7 @@ function AuthSignIn() {
 									className='bf-input'
 									style={{ paddingLeft: 40, paddingRight: 46 }}
 									type={showPw ? 'text' : 'password'}
+									placeholder='Your password'
 									value={password}
 									onChange={(e) => setPassword(e.target.value)}
 									required
@@ -535,85 +669,23 @@ function AuthSignIn() {
 									type='button'
 									onClick={() => setShowPw(!showPw)}
 									style={{
-										position: 'absolute',
-										right: 12,
-										top: '50%',
-										transform: 'translateY(-50%)',
-										background: 'none',
-										border: 'none',
-										cursor: 'pointer',
-										color: 'var(--bf-mute)',
-										padding: 4,
-										display: 'flex',
+										position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+										background: 'none', border: 'none', cursor: 'pointer',
+										color: 'var(--bf-mute)', padding: 4, display: 'flex',
 									}}
 								>
-									<EyeIcon />
+									<EyeIcon visible={showPw} />
 								</button>
 							</div>
 						</div>
-						<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-							<button
-								type='button'
-								onClick={() => setRemember(!remember)}
-								style={{
-									width: 18,
-									height: 18,
-									borderRadius: 5,
-									border: `2px solid ${remember ? 'var(--bf-ember)' : 'var(--bf-line-2)'}`,
-									background: remember ? 'var(--bf-ember)' : 'transparent',
-									cursor: 'pointer',
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									transition: 'all .15s',
-									flexShrink: 0,
-								}}
-							>
-								{remember && (
-									<svg
-										width={10}
-										height={10}
-										viewBox='0 0 24 24'
-										fill='none'
-										stroke='#fff'
-										strokeWidth={3}
-										strokeLinecap='round'
-										strokeLinejoin='round'
-									>
-										<path d='M4 12l5 5L20 6' />
-									</svg>
-								)}
-							</button>
-							<span style={{ fontSize: 13, color: 'var(--bf-ink-2)' }}>
-								Remember me for 30 days
-							</span>
-						</div>
 
-						{error && (
-							<div
-								style={{
-									padding: '10px 14px',
-									borderRadius: 10,
-									background: 'rgba(239,68,68,.08)',
-									border: '1px solid rgba(239,68,68,.2)',
-									color: 'var(--bf-error)',
-									fontSize: 13,
-									fontWeight: 600,
-								}}
-							>
-								{error}
-							</div>
-						)}
+						{error && <ErrorBanner message={error} />}
 
 						<button
 							className='bf-btn bf-btn-primary bf-btn-lg'
 							style={{
-								width: '100%',
-								marginTop: 4,
-								fontSize: 15,
-								padding: '14px 0',
-								borderRadius: 12,
-								opacity: isLoading ? 0.7 : 1,
+								width: '100%', marginTop: 4, fontSize: 15,
+								padding: '14px 0', borderRadius: 12, opacity: isLoading ? 0.7 : 1,
 							}}
 							type='submit'
 							disabled={isLoading}
@@ -621,39 +693,22 @@ function AuthSignIn() {
 							{isLoading ? 'Signing in…' : (
 								<>
 									Sign in
-									<svg
-										width={18}
-										height={18}
-										viewBox='0 0 24 24'
-										fill='none'
-										stroke='currentColor'
-										strokeWidth={2.2}
-										strokeLinecap='round'
-										strokeLinejoin='round'
-									>
+									<svg width={18} height={18} viewBox='0 0 24 24' fill='none'
+										stroke='currentColor' strokeWidth={2.2} strokeLinecap='round' strokeLinejoin='round'>
 										<path d='M5 12h14M13 6l6 6-6 6' />
 									</svg>
 								</>
 							)}
 						</button>
+
 						<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-							<div
-								style={{ flex: 1, height: 1, background: 'var(--bf-line)' }}
-							/>
-							<span
-								style={{
-									fontSize: 11.5,
-									color: 'var(--bf-mute)',
-									fontFamily: 'var(--bf-mono)',
-									letterSpacing: '0.08em',
-								}}
-							>
+							<div style={{ flex: 1, height: 1, background: 'var(--bf-line)' }} />
+							<span style={{ fontSize: 11.5, color: 'var(--bf-mute)', fontFamily: 'var(--bf-mono)', letterSpacing: '0.08em' }}>
 								or
 							</span>
-							<div
-								style={{ flex: 1, height: 1, background: 'var(--bf-line)' }}
-							/>
+							<div style={{ flex: 1, height: 1, background: 'var(--bf-line)' }} />
 						</div>
+
 						<p style={{ textAlign: 'center', fontSize: 13.5, color: 'var(--bf-ink-2)' }}>
 							New to Buddy Feast?{' '}
 							<Link href='/auth/register' style={{ fontWeight: 700, color: 'var(--bf-ember)' }}>
@@ -674,243 +729,230 @@ function AuthSignIn() {
 }
 
 // ─── Sign Up ──────────────────────────────────────────────────────────────────
+
+type SignUpStep = 'form' | 'otp'
+
 function AuthSignUp() {
 	const router = useRouter()
 	const { setToken, setUser } = useAuthStore()
 
+	// Step management
+	const [step, setStep] = useState<SignUpStep>('form')
+	const [otpData, setOtpData] = useState<{ identifier: string; identifierType: string } | null>(null)
+
+	// Form fields
 	const [name, setName] = useState('')
-	const [phone, setPhone] = useState('')
-	const [email, setEmail] = useState('')
+	const [identifier, setIdentifier] = useState('')
 	const [password, setPassword] = useState('')
-	const [address, setAddress] = useState('')
 	const [showPw, setShowPw] = useState(false)
 	const [isLoading, setIsLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [identifierTouched, setIdentifierTouched] = useState(false)
 
-	type StrengthLevel = 0 | 1 | 2 | 3
-	const STRENGTH_COLORS: Record<StrengthLevel, string> = {
-		0: 'transparent',
-		1: '#ef4444',
-		2: 'var(--bf-amber)',
-		3: 'var(--bf-leaf)',
-	}
-	const STRENGTH_LABELS: Record<StrengthLevel, string> = {
-		0: '',
-		1: 'Weak',
-		2: 'Good',
-		3: 'Strong',
-	}
-	const strength: StrengthLevel =
-		password.length === 0 ? 0 : password.length < 6 ? 1 : password.length < 10 ? 2 : 3
-	const strengthColor = STRENGTH_COLORS[strength]
-	const strengthLabel = STRENGTH_LABELS[strength]
+	// Identifier validation state
+	const detectedType = detectType(identifier)
+	const identifierValid = isValidIdentifier(identifier)
+	const identifierHasContent = identifier.trim().length > 0
+	const showIdentifierFeedback = identifierHasContent && identifierTouched
 
-	async function handleSubmit(e: React.FormEvent) {
+	// Password strength
+	type Strength = 0 | 1 | 2 | 3
+	const strength: Strength =
+		password.length === 0 ? 0
+		: password.length < 6 ? 1
+		: password.length < 10 ? 2
+		: 3
+	const STRENGTH_COLOR: Record<Strength, string> = {
+		0: 'transparent', 1: '#ef4444', 2: 'var(--bf-amber)', 3: 'var(--bf-leaf)',
+	}
+	const STRENGTH_LABEL: Record<Strength, string> = {
+		0: '', 1: 'Weak', 2: 'Good', 3: 'Strong',
+	}
+
+	async function handleFormSubmit(e: React.FormEvent) {
 		e.preventDefault()
+		setIdentifierTouched(true)
+		if (!identifierValid) return
 		setError(null)
 		setIsLoading(true)
 		try {
-			const { data } = await apiClient.post<AuthResponse>('/v1/auth/customer/register', {
-				name,
-				phone,
-				email,
+			const { data } = await apiClient.post<InitiateResponse>('/v1/auth/customer/register', {
+				name: name.trim(),
+				identifier: identifier.trim().replace(/[\s\-]/g, ''),
 				password,
-				address,
-				city: 'Multan',
 			})
-			if (data.token) {
-				localStorage.setItem('token', data.token)
-				if (data.user) localStorage.setItem('user', JSON.stringify(data.user))
-				setToken(data.token)
-				if (data.user) setUser(data.user)
-				router.push('/')
-			}
+			setOtpData({ identifier: data.identifier, identifierType: data.identifierType })
+			setStep('otp')
 		} catch (err: unknown) {
 			const status = (err as { response?: { status?: number } })?.response?.status
 			const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-			if (status === 409 || (msg && msg.toLowerCase().includes('exist'))) {
-				setError('An account with this phone or email already exists.')
-			} else if (msg) {
-				setError(msg)
+			if (status === 409) {
+				setError(msg || 'An account with this contact already exists.')
 			} else {
-				setError('Registration failed. Please try again.')
+				setError(msg || 'Registration failed. Please try again.')
 			}
 		} finally {
 			setIsLoading(false)
 		}
 	}
 
-	const EyeIcon = () => (
-		<svg
-			width={18}
-			height={18}
-			viewBox='0 0 24 24'
-			fill='none'
-			stroke='currentColor'
-			strokeWidth={1.8}
-			strokeLinecap='round'
-			strokeLinejoin='round'
-		>
-			{showPw ? (
-				<>
-					<path d='M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94' />
-					<path d='M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19' />
-					<line x1='1' y1='1' x2='23' y2='23' />
-				</>
-			) : (
-				<>
-					<path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z' />
-					<circle cx='12' cy='12' r='3' />
-				</>
-			)}
-		</svg>
-	)
+	function handleOtpSuccess(token: string, user: User | undefined) {
+		setToken(token)
+		if (user) setUser(user)
+		router.push('/')
+	}
 
-	function FieldIcon({ d }: { d: React.ReactNode }) {
+	// Identifier icon
+	function IdentifierIcon() {
+		if (detectedType === 'email') {
+			return (
+				<svg width={16} height={16} viewBox='0 0 24 24' fill='none'
+					stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
+					<rect x='2' y='4' width='20' height='16' rx='2' />
+					<path d='M2 8l10 7 10-7' />
+				</svg>
+			)
+		}
 		return (
-			<span
-				style={{
-					position: 'absolute',
-					left: 14,
-					top: '50%',
-					transform: 'translateY(-50%)',
-					color: 'var(--bf-mute)',
-					display: 'flex',
-					pointerEvents: 'none',
-				}}
-			>
-				<svg
-					width={16}
-					height={16}
-					viewBox='0 0 24 24'
-					fill='none'
-					stroke='currentColor'
-					strokeWidth={2}
-					strokeLinecap='round'
-					strokeLinejoin='round'
-				>
-					{d}
+			<svg width={16} height={16} viewBox='0 0 24 24' fill='none'
+				stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
+				<path d='M5 4h4l2 5-3 2a11 11 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z' />
+			</svg>
+		)
+	}
+
+	// Validation badge
+	function IdentifierBadge() {
+		if (!showIdentifierFeedback) return null
+		if (identifierValid) {
+			return (
+				<span style={{
+					position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+					color: 'var(--bf-leaf)', display: 'flex', pointerEvents: 'none',
+				}}>
+					<svg width={18} height={18} viewBox='0 0 24 24' fill='none'
+						stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round'>
+						<path d='M20 6L9 17l-5-5' />
+					</svg>
+				</span>
+			)
+		}
+		return (
+			<span style={{
+				position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+				color: 'var(--bf-error)', display: 'flex', pointerEvents: 'none',
+			}}>
+				<svg width={18} height={18} viewBox='0 0 24 24' fill='none'
+					stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round'>
+					<line x1='18' y1='6' x2='6' y2='18' />
+					<line x1='6' y1='6' x2='18' y2='18' />
 				</svg>
 			</span>
 		)
 	}
 
+	function IdentifierHint() {
+		if (!showIdentifierFeedback) {
+			return (
+				<p style={{ marginTop: 5, fontSize: 12, color: 'var(--bf-mute)' }}>
+					Enter your email address or Pakistani phone number
+				</p>
+			)
+		}
+		if (identifierValid) {
+			return (
+				<p style={{ marginTop: 5, fontSize: 12, color: 'var(--bf-leaf)', fontWeight: 600 }}>
+					Valid {detectedType === 'email' ? 'email address' : 'phone number'}
+				</p>
+			)
+		}
+		if (detectedType === 'email') {
+			return (
+				<p style={{ marginTop: 5, fontSize: 12, color: 'var(--bf-error)', fontWeight: 600 }}>
+					Invalid email — check format (e.g. name@example.com)
+				</p>
+			)
+		}
+		return (
+			<p style={{ marginTop: 5, fontSize: 12, color: 'var(--bf-error)', fontWeight: 600 }}>
+				Invalid phone — use format 03001234567 or +923001234567
+			</p>
+		)
+	}
+
+	// Render OTP step
+	if (step === 'otp' && otpData) {
+		return (
+			<AuthShell>
+				<div className='bf-auth-grid' style={{
+					width: '100%', maxWidth: 900,
+					display: 'grid', gridTemplateColumns: '1fr 1fr',
+					background: 'var(--bf-paper)', borderRadius: 20, overflow: 'hidden',
+					boxShadow: '0 24px 60px rgba(35,31,32,.14)',
+				}}>
+					<div className='bf-auth-panel-col' style={{ padding: 40 }}>
+						<AuthPanel />
+					</div>
+					<div className='bf-auth-form-col' style={{
+						padding: '48px 48px', display: 'flex', flexDirection: 'column',
+						justifyContent: 'center', borderLeft: '1px solid var(--bf-line)',
+					}}>
+						<OtpStep
+							identifier={otpData.identifier}
+							identifierType={otpData.identifierType}
+							onBack={() => { setStep('form'); setError(null) }}
+							onSuccess={handleOtpSuccess}
+						/>
+					</div>
+				</div>
+			</AuthShell>
+		)
+	}
+
+	// Render form step
 	return (
 		<AuthShell>
-			<div
-				style={{
-					width: '100%',
-					maxWidth: 960,
-					display: 'grid',
-					gridTemplateColumns: '5fr 7fr',
-					gap: 0,
-					background: 'var(--bf-paper)',
-					borderRadius: 20,
-					overflow: 'hidden',
-					boxShadow: '0 24px 60px rgba(35,31,32,.14)',
-				}}
-			>
-				<div style={{ padding: 40 }}>
+			<div className='bf-auth-grid' style={{
+				width: '100%', maxWidth: 960,
+				display: 'grid', gridTemplateColumns: '5fr 7fr',
+				background: 'var(--bf-paper)', borderRadius: 20, overflow: 'hidden',
+				boxShadow: '0 24px 60px rgba(35,31,32,.14)',
+			}}>
+				<div className='bf-auth-panel-col' style={{ padding: 40 }}>
 					<AuthPanel />
 				</div>
 				<form
-					onSubmit={handleSubmit}
+					onSubmit={handleFormSubmit}
+					className='bf-auth-form-col'
 					style={{
-						padding: '40px 48px',
-						display: 'flex',
-						flexDirection: 'column',
-						justifyContent: 'center',
-						borderLeft: '1px solid var(--bf-line)',
+						padding: '40px 48px', display: 'flex', flexDirection: 'column',
+						justifyContent: 'center', borderLeft: '1px solid var(--bf-line)',
 					}}
 				>
-					<div
-						style={{
-							display: 'flex',
-							background: 'var(--bf-cream)',
-							borderRadius: 10,
-							padding: 4,
-							marginBottom: 32,
-							gap: 4,
-						}}
-					>
-						<Link
-							href='/auth/login'
-							style={{
-								flex: 1,
-								borderRadius: 8,
-								padding: '8px 0',
-								textAlign: 'center',
-								fontSize: 13,
-								fontWeight: 600,
-								color: 'var(--bf-mute)',
-								display: 'block',
-							}}
-						>
-							Sign in
-						</Link>
-						<div
-							style={{
-								flex: 1,
-								background: 'var(--bf-paper)',
-								borderRadius: 8,
-								padding: '8px 0',
-								textAlign: 'center',
-								fontSize: 13,
-								fontWeight: 700,
-								color: 'var(--bf-ink)',
-								boxShadow: '0 1px 4px rgba(35,31,32,.1)',
-								cursor: 'default',
-							}}
-						>
-							Create account
-						</div>
-					</div>
-					<p
-						style={{
-							fontSize: 21,
-							fontWeight: 900,
-							letterSpacing: '-0.03em',
-							color: 'var(--bf-ink)',
-							marginBottom: 4,
-						}}
-					>
+					<TabSwitcher active='signup' />
+
+					<p style={{ fontSize: 21, fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--bf-ink)', marginBottom: 4 }}>
 						Create your account
 					</p>
-					<p
-						style={{
-							fontSize: 13,
-							color: 'var(--bf-mute)',
-							marginBottom: 24,
-							lineHeight: 1.5,
-						}}
-					>
+					<p style={{ fontSize: 13, color: 'var(--bf-mute)', marginBottom: 24, lineHeight: 1.5 }}>
 						Join thousands of happy customers. Checkout 3× faster next time.
 					</p>
-					<div
-						style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}
-					>
-						<div style={{ gridColumn: '1 / -1' }}>
-							<label
-								style={{
-									display: 'block',
-									fontSize: 11.5,
-									fontWeight: 700,
-									color: 'var(--bf-ink-2)',
-									marginBottom: 6,
-									letterSpacing: '-0.01em',
-								}}
-							>
-								Full name
-							</label>
+
+					<div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+						{/* Full name */}
+						<div>
+							<FieldLabel>Full name</FieldLabel>
 							<div style={{ position: 'relative' }}>
-								<FieldIcon
-									d={
-										<>
-											<circle cx='12' cy='8' r='4' />
-											<path d='M4 20a8 8 0 0 1 16 0' />
-										</>
-									}
-								/>
+								<span style={{
+									position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+									color: 'var(--bf-mute)', display: 'flex', pointerEvents: 'none',
+								}}>
+									<svg width={16} height={16} viewBox='0 0 24 24' fill='none'
+										stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
+										<circle cx='12' cy='8' r='4' />
+										<path d='M4 20a8 8 0 0 1 16 0' />
+									</svg>
+								</span>
 								<input
 									className='bf-input'
 									style={{ paddingLeft: 40 }}
@@ -919,107 +961,68 @@ function AuthSignUp() {
 									onChange={(e) => setName(e.target.value)}
 									required
 									autoComplete='name'
+									autoFocus
 								/>
 							</div>
 						</div>
+
+						{/* Email or Phone — smart unified input */}
 						<div>
-							<label
-								style={{
-									display: 'block',
-									fontSize: 11.5,
-									fontWeight: 700,
-									color: 'var(--bf-ink-2)',
-									marginBottom: 6,
-									letterSpacing: '-0.01em',
-								}}
-							>
-								Phone
-							</label>
+							<FieldLabel>
+								Email or phone{' '}
+								{detectedType !== 'unknown' && identifier.length > 0 && (
+									<span style={{
+										display: 'inline-flex', alignItems: 'center',
+										marginLeft: 6, padding: '1px 7px', borderRadius: 20,
+										fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em',
+										textTransform: 'uppercase',
+										background: detectedType === 'email' ? 'rgba(99,102,241,.12)' : 'rgba(16,185,129,.12)',
+										color: detectedType === 'email' ? '#6366f1' : '#10b981',
+									}}>
+										{detectedType === 'email' ? 'Email' : 'Phone'}
+									</span>
+								)}
+							</FieldLabel>
 							<div style={{ position: 'relative' }}>
-								<FieldIcon
-									d={
-										<path d='M5 4h4l2 5-3 2a11 11 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z' />
-									}
-								/>
+								<span style={{
+									position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+									color: 'var(--bf-mute)', display: 'flex', pointerEvents: 'none',
+								}}>
+									<IdentifierIcon />
+								</span>
 								<input
 									className='bf-input'
-									style={{ paddingLeft: 40 }}
-									placeholder='923000000000'
-									value={phone}
-									onChange={(e) => setPhone(e.target.value)}
-									required
-									autoComplete='tel'
-								/>
-							</div>
-						</div>
-						<div>
-							<label
-								style={{
-									display: 'block',
-									fontSize: 11.5,
-									fontWeight: 700,
-									color: 'var(--bf-ink-2)',
-									marginBottom: 6,
-									letterSpacing: '-0.01em',
-								}}
-							>
-								Email
-							</label>
-							<div style={{ position: 'relative' }}>
-								<FieldIcon
-									d={
-										<>
-											<rect x='2' y='4' width='20' height='16' rx='2' />
-											<path d='M2 8l10 7 10-7' />
-										</>
-									}
-								/>
-								<input
-									className='bf-input'
-									style={{ paddingLeft: 40 }}
-									placeholder='ayesha@email.com'
-									type='email'
-									value={email}
-									onChange={(e) => setEmail(e.target.value)}
-									autoComplete='email'
-								/>
-							</div>
-						</div>
-						<div style={{ gridColumn: '1 / -1' }}>
-							<label
-								style={{
-									display: 'block',
-									fontSize: 11.5,
-									fontWeight: 700,
-									color: 'var(--bf-ink-2)',
-									marginBottom: 6,
-									letterSpacing: '-0.01em',
-								}}
-							>
-								Password
-							</label>
-							<div style={{ position: 'relative' }}>
-								<span
 									style={{
-										position: 'absolute',
-										left: 14,
-										top: '50%',
-										transform: 'translateY(-50%)',
-										color: 'var(--bf-mute)',
-										display: 'flex',
-										pointerEvents: 'none',
+										paddingLeft: 40, paddingRight: 40,
+										borderColor: showIdentifierFeedback && !identifierValid
+											? 'var(--bf-error)'
+											: showIdentifierFeedback && identifierValid
+											? 'var(--bf-leaf)'
+											: undefined,
 									}}
-								>
-									<svg
-										width={16}
-										height={16}
-										viewBox='0 0 24 24'
-										fill='none'
-										stroke='currentColor'
-										strokeWidth={2}
-										strokeLinecap='round'
-										strokeLinejoin='round'
-									>
+									placeholder='03001234567 or name@example.com'
+									value={identifier}
+									onChange={(e) => { setIdentifier(e.target.value); setError(null) }}
+									onBlur={() => setIdentifierTouched(true)}
+									required
+									autoComplete='off'
+									inputMode={detectedType === 'phone' ? 'tel' : 'email'}
+								/>
+								<IdentifierBadge />
+							</div>
+							<IdentifierHint />
+						</div>
+
+						{/* Password */}
+						<div>
+							<FieldLabel>Password</FieldLabel>
+							<div style={{ position: 'relative' }}>
+								<span style={{
+									position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+									color: 'var(--bf-mute)', display: 'flex', pointerEvents: 'none',
+								}}>
+									<svg width={16} height={16} viewBox='0 0 24 24' fill='none'
+										stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
 										<rect x='3' y='11' width='18' height='11' rx='2' />
 										<path d='M7 11V7a5 5 0 0 1 10 0v4' />
 									</svg>
@@ -1039,192 +1042,71 @@ function AuthSignUp() {
 									type='button'
 									onClick={() => setShowPw(!showPw)}
 									style={{
-										position: 'absolute',
-										right: 12,
-										top: '50%',
-										transform: 'translateY(-50%)',
-										background: 'none',
-										border: 'none',
-										cursor: 'pointer',
-										color: 'var(--bf-mute)',
-										padding: 4,
-										display: 'flex',
+										position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+										background: 'none', border: 'none', cursor: 'pointer',
+										color: 'var(--bf-mute)', padding: 4, display: 'flex',
 									}}
 								>
-									<EyeIcon />
+									<EyeIcon visible={showPw} />
 								</button>
 							</div>
 							{password.length > 0 && (
-								<div
-									style={{
-										marginTop: 8,
-										display: 'flex',
-										alignItems: 'center',
-										gap: 8,
-									}}
-								>
+								<div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
 									<div style={{ display: 'flex', gap: 4, flex: 1 }}>
 										{[1, 2, 3].map((n) => (
-											<div
-												key={n}
-												style={{
-													height: 3,
-													flex: 1,
-													borderRadius: 99,
-													background:
-														strength >= n ? strengthColor : 'var(--bf-line-2)',
-													transition: 'background .2s',
-												}}
-											/>
+											<div key={n} style={{
+												height: 3, flex: 1, borderRadius: 99,
+												background: strength >= n ? STRENGTH_COLOR[strength] : 'var(--bf-line-2)',
+												transition: 'background .2s',
+											}} />
 										))}
 									</div>
-									<span
-										style={{
-											fontSize: 11,
-											fontWeight: 700,
-											color: strengthColor,
-											fontFamily: 'var(--bf-mono)',
-											letterSpacing: '0.06em',
-										}}
-									>
-										{strengthLabel}
+									<span style={{
+										fontSize: 11, fontWeight: 700, color: STRENGTH_COLOR[strength],
+										fontFamily: 'var(--bf-mono)', letterSpacing: '0.06em',
+									}}>
+										{STRENGTH_LABEL[strength]}
 									</span>
 								</div>
 							)}
 						</div>
-						<div style={{ gridColumn: '1 / -1' }}>
-							<label
-								style={{
-									display: 'block',
-									fontSize: 11.5,
-									fontWeight: 700,
-									color: 'var(--bf-ink-2)',
-									marginBottom: 6,
-									letterSpacing: '-0.01em',
-								}}
-							>
-								Default delivery address{' '}
-								<span style={{ color: 'var(--bf-mute)', fontWeight: 500 }}>
-									(optional)
-								</span>
-							</label>
-							<div style={{ position: 'relative' }}>
-								<FieldIcon
-									d={
-										<>
-											<path d='M12 22s7-7.5 7-13a7 7 0 1 0-14 0c0 5.5 7 13 7 13z' />
-											<circle cx='12' cy='9' r='2.6' />
-										</>
-									}
-								/>
-								<input
-									className='bf-input'
-									style={{ paddingLeft: 40 }}
-									placeholder='House 14, Gulgasht Colony, Multan'
-									value={address}
-									onChange={(e) => setAddress(e.target.value)}
-									autoComplete='street-address'
-								/>
-							</div>
-						</div>
 
-						{error && (
-							<div
-								style={{
-									gridColumn: '1 / -1',
-									padding: '10px 14px',
-									borderRadius: 10,
-									background: 'rgba(239,68,68,.08)',
-									border: '1px solid rgba(239,68,68,.2)',
-									color: 'var(--bf-error)',
-									fontSize: 13,
-									fontWeight: 600,
-								}}
-							>
-								{error}
-							</div>
-						)}
+						{error && <ErrorBanner message={error} />}
 
-						<div
-							style={{
-								gridColumn: '1 / -1',
-								fontSize: 12,
-								color: 'var(--bf-mute)',
-								lineHeight: 1.5,
-							}}
-						>
-							By creating an account you agree to our{' '}
-							<Link
-								href='#'
-								style={{
-									color: 'var(--bf-ink-2)',
-									fontWeight: 600,
-									textDecoration: 'underline',
-									textUnderlineOffset: 2,
-								}}
-							>
+						<p style={{ fontSize: 12, color: 'var(--bf-mute)', lineHeight: 1.5 }}>
+							By continuing you agree to our{' '}
+							<Link href='#' style={{ color: 'var(--bf-ink-2)', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 2 }}>
 								Terms of Service
 							</Link>
 							{' & '}
-							<Link
-								href='#'
-								style={{
-									color: 'var(--bf-ink-2)',
-									fontWeight: 600,
-									textDecoration: 'underline',
-									textUnderlineOffset: 2,
-								}}
-							>
+							<Link href='#' style={{ color: 'var(--bf-ink-2)', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 2 }}>
 								Privacy Policy
 							</Link>
-							.
-						</div>
+						</p>
+
 						<button
 							className='bf-btn bf-btn-primary bf-btn-lg'
 							style={{
-								gridColumn: '1 / -1',
-								width: '100%',
-								marginTop: 4,
-								fontSize: 15,
-								padding: '14px 0',
-								borderRadius: 12,
-								opacity: isLoading ? 0.7 : 1,
+								width: '100%', marginTop: 4, fontSize: 15,
+								padding: '14px 0', borderRadius: 12, opacity: isLoading ? 0.7 : 1,
 							}}
 							type='submit'
 							disabled={isLoading}
 						>
-							{isLoading ? 'Creating account…' : (
+							{isLoading ? 'Sending code…' : (
 								<>
-									Create account
-									<svg
-										width={18}
-										height={18}
-										viewBox='0 0 24 24'
-										fill='none'
-										stroke='currentColor'
-										strokeWidth={2.2}
-										strokeLinecap='round'
-										strokeLinejoin='round'
-									>
+									Continue
+									<svg width={18} height={18} viewBox='0 0 24 24' fill='none'
+										stroke='currentColor' strokeWidth={2.2} strokeLinecap='round' strokeLinejoin='round'>
 										<path d='M5 12h14M13 6l6 6-6 6' />
 									</svg>
 								</>
 							)}
 						</button>
-						<p
-							style={{
-								gridColumn: '1 / -1',
-								textAlign: 'center',
-								fontSize: 13.5,
-								color: 'var(--bf-ink-2)',
-								marginTop: 4,
-							}}
-						>
+
+						<p style={{ textAlign: 'center', fontSize: 13.5, color: 'var(--bf-ink-2)' }}>
 							Already have an account?{' '}
-							<Link
-								href='/auth/login'
-								style={{ fontWeight: 700, color: 'var(--bf-ember)' }}
-							>
+							<Link href='/auth/login' style={{ fontWeight: 700, color: 'var(--bf-ember)' }}>
 								Sign in →
 							</Link>
 						</p>

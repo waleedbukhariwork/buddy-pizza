@@ -54,6 +54,12 @@ export interface Product {
 	priceSmall?: number | null
 	priceMedium?: number | null
 	priceLarge?: number | null
+	labelSmall?: string | null
+	labelMedium?: string | null
+	labelLarge?: string | null
+	discountPct?: number | null
+	discountAmount?: number | null
+	sizesJson?: string | null
 }
 
 export interface Category {

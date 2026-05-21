@@ -1,6 +1,6 @@
 import useSWR from 'swr'
 import { apiClient } from './api-client'
-import type { User } from '@shared/index'
+import type { User, CartItem } from '@shared/index'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface Product {
@@ -92,8 +92,8 @@ export function useDeals() {
 	return useSWR<Deal[]>('/v1/deals', fetcher)
 }
 
-export function useMyOrders() {
-	return useSWR<Order[]>('/v1/orders', fetcher)
+export function useMyOrders(enabled = true) {
+	return useSWR<Order[]>(enabled ? '/v1/orders' : null, fetcher)
 }
 
 export function useMyProfile(enabled = true) {
@@ -129,6 +129,30 @@ export async function placeOrder(payload: {
 }): Promise<PlacedOrder> {
 	const { data } = await apiClient.post<PlacedOrder>('/v1/orders', payload)
 	return data
+}
+
+// ─── Server cart ──────────────────────────────────────────────────────────────
+export interface ServerCartDTO {
+	userId: number
+	items: CartItem[]
+	total: number
+	updatedAt: string | null
+}
+
+export function useServerCart() {
+	return useSWR<ServerCartDTO>('/v1/cart', fetcher, {
+		revalidateOnFocus: false,
+		revalidateOnReconnect: false,
+	})
+}
+
+export async function syncCartToServer(items: CartItem[]): Promise<ServerCartDTO> {
+	const { data } = await apiClient.put<ServerCartDTO>('/v1/cart', items)
+	return data
+}
+
+export async function clearServerCart(): Promise<void> {
+	await apiClient.delete('/v1/cart')
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

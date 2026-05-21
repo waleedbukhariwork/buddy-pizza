@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { CustomerShell } from '../layout/customer-shell'
 import { FoodImg, type Tone } from '../ui/food-img'
-import { FoodCard } from '../menu/food-card'
+import { RelatedProductsRow } from '../product/related-products-row'
 import { HotBadge } from '../ui/hot-badge'
 import { Icons } from '../ui/icon'
 import { rs, useProducts, type Product } from '../../lib/hooks'
@@ -598,30 +598,9 @@ function ProductDetailPage({ productId }: { productId: number }) {
 						</div>
 					</div>
 
-					{/* ── Related items ── */}
 					{related.length > 0 && (
-						<div className='bf-pd-related bf-fade-up-2'>
-							<hr className='bf-rule' style={{ margin: '44px 0 24px' }} />
-							<div className='bf-eyebrow' style={{ marginBottom: 6, color: 'var(--bf-ember)' }}>
-								MORE FROM
-							</div>
-							<h2
-								style={{
-									fontWeight: 800,
-									fontSize: 28,
-									letterSpacing: '-0.022em',
-									marginBottom: 20,
-								}}
-							>
-								{product.category}
-							</h2>
-							<div className='bf-pd-related-scroll'>
-								{related.map((rel, i) => (
-									<div key={rel.id} className='bf-pd-related-card'>
-										<FoodCard item={rel} variant='grid' tone={TONES[i % TONES.length]} />
-									</div>
-								))}
-							</div>
+						<div className='bf-fade-up-2'>
+							<RelatedProductsRow title={product.category} products={related} />
 						</div>
 					)}
 				</div>

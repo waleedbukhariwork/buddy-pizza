@@ -242,7 +242,7 @@ function FoodCard({
 	tone = 'cream',
 }: {
 	item: Product
-	variant?: 'grid' | 'list'
+	variant?: 'grid' | 'list' | 'compact'
 	tone?: Tone
 }) {
 	const addItem = useCartStore((s) => s.addItem)
@@ -314,6 +314,54 @@ function FoodCard({
 
 	function handleIncrement() {
 		updateQuantity(item.id, cartQty + 1)
+	}
+
+	// ── Compact variant (related products — uniform height) ─────────────────────
+	if (variant === 'compact') {
+		return (
+			<div
+				className='bf-card bf-lift bf-food-card-compact'
+				onClick={() => router.push(`/menu/${item.id}`)}
+			>
+				<div className='bf-food-card-compact-media'>
+					<FoodImg tone={tone} caption={item.name.toLowerCase()} style={{ height: '100%', borderRadius: 10 }} />
+					{item.isHot && (
+						<div className='bf-food-card-compact-hot'>
+							<HotBadge />
+						</div>
+					)}
+				</div>
+				<div className='bf-food-card-compact-body'>
+					<div className='bf-food-card-compact-title'>{item.name}</div>
+					<div className='bf-food-card-compact-footer' onClick={(e) => e.stopPropagation()}>
+						<div className='bf-food-card-compact-price'>
+							{hasSizes ? (
+								<>
+									<span className='bf-food-card-compact-from'>From</span>
+									{rs(sizes[0].price)}
+								</>
+							) : (
+								rs(item.price)
+							)}
+						</div>
+						{added ? (
+							<button type='button' className='bf-btn bf-btn-success bf-added-btn' disabled style={{ width: 32, height: 32, padding: 0, borderRadius: 999 }}>
+								<CheckIcon />
+							</button>
+						) : !hasSizes && cartQty > 0 ? (
+							<CardStepper key={`stepper-${item.id}`} qty={cartQty} onDecrement={handleDecrement} onIncrement={handleIncrement} />
+						) : (
+							<button type='button' className='bf-btn bf-btn-ink' onClick={handleAdd} style={{ width: 32, height: 32, padding: 0, borderRadius: 999 }}>
+								{Icons.plus}
+							</button>
+						)}
+					</div>
+				</div>
+				{showPicker && hasSizes && (
+					<SizePicker sizes={sizes} onPick={pickSize} onClose={() => setShowPicker(false)} />
+				)}
+			</div>
+		)
 	}
 
 	// ── List variant ──────────────────────────────────────────────────────────
@@ -415,25 +463,19 @@ function FoodCard({
 	return (
 		<div
 			className='bf-card bf-lift'
-			style={{ padding: 12, cursor: 'pointer', position: 'relative' }}
+			style={{ padding: 12, cursor: 'pointer', position: 'relative', display: 'flex', flexDirection: 'column' }}
 			onClick={() => router.push(`/menu/${item.id}`)}
 		>
 			<FoodImg
 				tone={tone}
 				caption={item.name.toLowerCase()}
-				style={{ height: 140 }}
+				style={{ height: 130, flexShrink: 0 }}
 			/>
-			<div style={{ padding: '12px 4px 4px' }}>
-				<div
-					style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}
-				>
-					<div
-						style={{
-							fontWeight: 800,
-							fontSize: 15,
-							letterSpacing: '-0.01em',
-						}}
-					>
+
+			{/* Body — grows to fill card height so CTA always sits at the bottom */}
+			<div style={{ flex: 1, padding: '10px 4px 4px', display: 'flex', flexDirection: 'column' }}>
+				<div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+					<div style={{ fontWeight: 800, fontSize: 15, letterSpacing: '-0.01em' }}>
 						{item.name}
 					</div>
 					{item.isHot && <HotBadge />}
@@ -453,28 +495,15 @@ function FoodCard({
 					{item.description}
 				</div>
 
-				{/* ── Price + action row ── */}
-				<div
-					style={{
-						display: 'flex',
-						justifyContent: 'space-between',
-						alignItems: 'center',
-						marginTop: 10,
-						position: 'relative',
-					}}
-				>
+				{/* Spacer */}
+				<div style={{ flex: 1 }} />
+
+				{/* Price + CTA — always at bottom */}
+				<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
 					<div style={{ fontWeight: 800, fontSize: 16 }}>
 						{hasSizes ? (
 							<>
-								<span
-									style={{
-										fontSize: 11,
-										fontWeight: 600,
-										color: 'var(--bf-mute)',
-									}}
-								>
-									From{' '}
-								</span>
+								<span style={{ fontSize: 11, fontWeight: 600, color: 'var(--bf-mute)' }}>From </span>
 								{rs(sizes[0].price)}
 							</>
 						) : (
