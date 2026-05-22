@@ -9,6 +9,8 @@ export type OrderStatus =
 export interface OrderItem {
 	id: number
 	product: { id: number; name: string; price: number } | null
+	dealId?: number | null
+	itemName?: string | null
 	quantity: number
 	price: number
 	customizations?: string | null

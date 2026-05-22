@@ -137,7 +137,7 @@ export function topItems(
 	const counts: Record<string, number> = {}
 	for (const order of orders) {
 		for (const item of order.items ?? []) {
-			const name = item.product?.name ?? 'Unknown'
+			const name = item.itemName ?? item.product?.name ?? 'Unknown'
 			counts[name] = (counts[name] ?? 0) + (item.quantity ?? 1)
 		}
 	}
