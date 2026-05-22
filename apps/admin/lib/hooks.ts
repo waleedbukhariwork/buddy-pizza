@@ -7,6 +7,34 @@ async function fetcher<T>(url: string): Promise<T> {
 	return data
 }
 
+function extractArray<T>(
+	payload: unknown,
+	preferredKeys: string[] = [],
+): T[] | null {
+	if (Array.isArray(payload)) return payload as T[]
+	if (!payload || typeof payload !== 'object') return null
+
+	const record = payload as Record<string, unknown>
+	const keys = [...preferredKeys, 'data', 'content', 'items', 'results']
+
+	for (const key of keys) {
+		if (!Object.prototype.hasOwnProperty.call(record, key)) continue
+
+		const nested = extractArray<T>(record[key])
+		if (nested) return nested
+	}
+
+	return null
+}
+
+async function fetchList<T>(
+	url: string,
+	preferredKeys: string[] = [],
+): Promise<T[]> {
+	const data = await fetcher<unknown>(url)
+	return extractArray<T>(data, preferredKeys) ?? []
+}
+
 export function useDashboardMetrics() {
 	return useSWR<DashboardMetrics>('/v1/admin/dashboard', fetcher, {
 		refreshInterval: 30_000,
@@ -14,21 +42,31 @@ export function useDashboardMetrics() {
 }
 
 export function useOrders() {
-	return useSWR<Order[]>('/v1/admin/orders', fetcher, {
-		refreshInterval: 15_000,
-	})
+	return useSWR<Order[]>(
+		'/v1/admin/orders',
+		(url: string) => fetchList<Order>(url, ['orders']),
+		{
+			refreshInterval: 15_000,
+		},
+	)
 }
 
 export function useProducts() {
-	return useSWR<Product[]>('/v1/products', fetcher)
+	return useSWR<Product[]>('/v1/products', (url: string) =>
+		fetchList<Product>(url, ['products']),
+	)
 }
 
 export function useCategories() {
-	return useSWR<Category[]>('/v1/admin/categories', fetcher)
+	return useSWR<Category[]>('/v1/admin/categories', (url: string) =>
+		fetchList<Category>(url, ['categories']),
+	)
 }
 
 export function useDeals() {
-	return useSWR<Deal[]>('/v1/admin/deals', fetcher)
+	return useSWR<Deal[]>('/v1/admin/deals', (url: string) =>
+		fetchList<Deal>(url, ['deals']),
+	)
 }
 
 export async function updateOrderStatus(id: number, status: string) {

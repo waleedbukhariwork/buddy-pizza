@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { Logo } from '../ui/logo'
@@ -42,15 +42,16 @@ function validateFields(phone: string, house: string, area: string) {
 }
 
 // ─── Error banner ─────────────────────────────────────────────────────────────
-function ErrorBanner({ message }: { message: string }) {
+function ErrorBanner({ message, tone = 'error' }: { message: string; tone?: 'error' | 'info' }) {
+	const isInfo = tone === 'info'
 	return (
 		<div role='alert' style={{
 			padding: '11px 14px',
 			borderRadius: 10,
-			background: 'rgba(232, 67, 31, 0.07)',
-			border: '1px solid rgba(232, 67, 31, 0.22)',
+			background: isInfo ? 'var(--bf-cream-2)' : 'rgba(232, 67, 31, 0.07)',
+			border: isInfo ? '1px solid var(--bf-line-2)' : '1px solid rgba(232, 67, 31, 0.22)',
 			font: '600 12.5px var(--bf-font)',
-			color: 'var(--bf-ember)',
+			color: isInfo ? 'var(--bf-ink-2)' : 'var(--bf-ember)',
 			display: 'flex',
 			alignItems: 'center',
 			gap: 8,
@@ -89,6 +90,7 @@ function CheckoutExperience() {
 	const removeItem = useCartStore((s) => s.removeItem)
 	const clearCart = useCartStore((s) => s.clearCart)
 	const subtotal = items.reduce((s, i) => s + (i.sizePrice ?? i.price) * i.quantity, 0)
+	const itemCount = items.reduce((s, i) => s + i.quantity, 0)
 
 	const [hydrated, setHydrated] = useState(false)
 	const [gpsLoading, setGpsLoading] = useState(false)
@@ -121,21 +123,39 @@ function CheckoutExperience() {
 	// Submission state
 	const [submitting, setSubmitting] = useState(false)
 	const [submitError, setSubmitError] = useState<string | null>(null)
+	const [validationError, setValidationError] = useState<string | null>(null)
 	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 	const [touched, setTouched] = useState<Record<string, boolean>>({})
+	const [lockedCheckout, setLockedCheckout] = useState<{ subtotal: number; itemCount: number } | null>(null)
+	const phoneRef = useRef<HTMLInputElement>(null)
+	const houseRef = useRef<HTMLInputElement>(null)
+	const areaRef = useRef<HTMLInputElement>(null)
+	const validationRef = useRef<HTMLDivElement>(null)
+
+	const displaySubtotal = submitting && lockedCheckout ? lockedCheckout.subtotal : subtotal
+	const displayItemCount = submitting && lockedCheckout ? lockedCheckout.itemCount : itemCount
 
 	const ETA_MIN = 28
 	const ETA_MAX = 34
 
 	function handleGPS() {
-		if (!navigator.geolocation) return
+		setSubmitError(null)
+		if (!navigator.geolocation) {
+			setValidationError('Location is not available in this browser. Please enter your address manually.')
+			return
+		}
 		setGpsLoading(true)
 		navigator.geolocation.getCurrentPosition(
 			() => {
 				setArea('Current location')
+				setValidationError(null)
+				setFieldErrors((e) => ({ ...e, area: '' }))
 				setGpsLoading(false)
 			},
-			() => setGpsLoading(false),
+			() => {
+				setGpsLoading(false)
+				setValidationError('We could not get your location. Please enter your address manually.')
+			},
 			{ timeout: 8000 },
 		)
 	}
@@ -148,30 +168,56 @@ function CheckoutExperience() {
 
 	function clearFieldError(field: string) {
 		if (touched[field]) setFieldErrors((e) => ({ ...e, [field]: '' }))
+		setValidationError(null)
 	}
 
 	async function handlePlaceOrder() {
+		if (submitting) return
+		if (items.length === 0) {
+			setSubmitError('Your cart is empty. Add an item before placing an order.')
+			return
+		}
+
 		const errs = validateFields(phone, house, area)
 		setFieldErrors(errs)
 		setTouched({ phone: true, house: true, area: true })
+		setSubmitError(null)
 
-		if (Object.keys(errs).length > 0) return
+		if (Object.keys(errs).length > 0) {
+			setValidationError('Please complete the required delivery details before placing your order.')
+			window.requestAnimationFrame(() => {
+				validationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+				if (errs.phone) phoneRef.current?.focus()
+				else if (errs.house) houseRef.current?.focus()
+				else if (errs.area) areaRef.current?.focus()
+			})
+			return
+		}
 
+		const orderItems = items
+			.filter((it) => it.productId > 0)
+			.map((it) => ({
+				productId: it.productId,
+				quantity: it.quantity,
+				customizations: [it.size, it.customizations].filter(Boolean).join(', ') || undefined,
+			}))
+
+		if (orderItems.length === 0) {
+			setSubmitError('We need at least one menu item in your cart before checkout.')
+			return
+		}
+
+		setLockedCheckout({ subtotal, itemCount })
 		setSubmitting(true)
 		setSubmitError(null)
+		setValidationError(null)
 
 		try {
 			const addressParts = [fullName.trim(), house.trim(), area.trim(), landmark.trim()].filter(Boolean)
 			const deliveryAddress = addressParts.join(', ')
 
 			const order = await placeOrder({
-				items: items
-					.filter((it) => it.productId > 0)
-					.map((it) => ({
-						productId: it.productId,
-						quantity: it.quantity,
-						customizations: [it.size, it.customizations].filter(Boolean).join(', ') || undefined,
-					})),
+				items: orderItems,
 				deliveryAddress,
 				customerPhone: phone.trim(),
 			})
@@ -186,6 +232,7 @@ function CheckoutExperience() {
 		} catch {
 			setSubmitError("We couldn't place your order. Please check your connection and try again.")
 			setSubmitting(false)
+			setLockedCheckout(null)
 		}
 	}
 
@@ -212,8 +259,10 @@ function CheckoutExperience() {
 				borderBottom: '1px solid var(--bf-line)',
 			}}>
 				<Logo size={22} />
-				<Stepper active={1} />
-				<div style={{ display: 'flex', gap: 6, alignItems: 'center', font: '500 13px var(--bf-font)', color: 'var(--bf-ink-2)' }}>
+				<div className='bf-checkout-stepper'>
+					<Stepper active={1} />
+				</div>
+				<div className='bf-checkout-eta' style={{ display: 'flex', gap: 6, alignItems: 'center', font: '500 13px var(--bf-font)', color: 'var(--bf-ink-2)' }}>
 					{Icons.clock} ETA {ETA_MIN}–{ETA_MAX} min
 				</div>
 			</header>
@@ -226,6 +275,12 @@ function CheckoutExperience() {
 				{/* ── Form column ── */}
 				<div className='bf-checkout-form-col' style={{ paddingRight: 40, display: 'flex', flexDirection: 'column', gap: 22 }}>
 					<h1 style={{ fontWeight: 800, fontSize: 40, margin: 0, letterSpacing: '-0.028em' }}>Checkout</h1>
+
+					{validationError && (
+						<div ref={validationRef}>
+							<ErrorBanner message={validationError} />
+						</div>
+					)}
 
 					{/* 01 — Delivery address */}
 					<section className='bf-card' style={{ padding: 22 }}>
@@ -263,7 +318,7 @@ function CheckoutExperience() {
 							<div style={{ flex: 1, height: 1, background: 'var(--bf-line)' }} />
 						</div>
 
-						<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+						<div className='bf-checkout-address-grid' style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
 							<div>
 								<label className='bf-label'>Full name</label>
 								<input className='bf-input' value={fullName} onChange={e => setFullName(e.target.value)} placeholder='Ayesha Khan' />
@@ -271,6 +326,7 @@ function CheckoutExperience() {
 							<div>
 								<label className='bf-label'>Phone *</label>
 								<input
+									ref={phoneRef}
 									className={inputCls('phone')}
 									value={phone}
 									onChange={e => { setPhone(e.target.value); clearFieldError('phone') }}
@@ -279,9 +335,10 @@ function CheckoutExperience() {
 								/>
 								<FieldErr field='phone' />
 							</div>
-							<div style={{ gridColumn: 'span 2' }}>
+							<div className='bf-checkout-wide-field' style={{ gridColumn: 'span 2' }}>
 								<label className='bf-label'>House / flat # *</label>
 								<input
+									ref={houseRef}
 									className={inputCls('house')}
 									value={house}
 									onChange={e => { setHouse(e.target.value); clearFieldError('house') }}
@@ -289,9 +346,10 @@ function CheckoutExperience() {
 								/>
 								<FieldErr field='house' />
 							</div>
-							<div style={{ gridColumn: 'span 2' }}>
+							<div className='bf-checkout-wide-field' style={{ gridColumn: 'span 2' }}>
 								<label className='bf-label'>Area *</label>
 								<input
+									ref={areaRef}
 									className={inputCls('area')}
 									value={area}
 									onChange={e => { setArea(e.target.value); clearFieldError('area') }}
@@ -301,12 +359,12 @@ function CheckoutExperience() {
 							</div>
 
 							{showLandmark ? (
-								<div style={{ gridColumn: 'span 2' }}>
+								<div className='bf-checkout-wide-field' style={{ gridColumn: 'span 2' }}>
 									<label className='bf-label'>Landmark (optional)</label>
 									<input className='bf-input' placeholder='Near Khaadi / opposite X bank' value={landmark} onChange={e => setLandmark(e.target.value)} autoFocus />
 								</div>
 							) : (
-								<div style={{ gridColumn: 'span 2' }}>
+								<div className='bf-checkout-wide-field' style={{ gridColumn: 'span 2' }}>
 									<button
 										onClick={() => setShowLandmark(true)}
 										style={{ background: 'none', border: 'none', cursor: 'pointer', font: '600 12.5px var(--bf-font)', color: 'var(--bf-ink-2)', padding: 0, textDecoration: 'underline', textUnderlineOffset: 2 }}
@@ -443,6 +501,7 @@ function CheckoutExperience() {
 									</div>
 									<span style={{ fontWeight: 800, fontSize: 14 }}>{rs((it.sizePrice ?? it.price) * it.quantity)}</span>
 									<button
+										disabled={submitting}
 										className='bf-btn bf-btn-ghost bf-btn-icon'
 										onClick={() => removeItem(it.productId, it.size, it.dealId)}
 										style={{ width: 24, height: 24, color: 'var(--bf-mute)' }}
@@ -453,21 +512,32 @@ function CheckoutExperience() {
 							))
 						)}
 						<hr className='bf-rule' />
-						<CartTotals subtotal={subtotal} />
+						<CartTotals subtotal={displaySubtotal} />
 
 						{submitError && (
 							<div style={{ marginTop: 14 }}>
 								<ErrorBanner message={submitError} />
 							</div>
 						)}
+						{!submitError && items.length === 0 && (
+							<div style={{ marginTop: 14 }}>
+								<ErrorBanner tone='info' message='Your cart is empty. Add something tasty from the menu to continue.' />
+							</div>
+						)}
+						{submitting && (
+							<div style={{ marginTop: 14 }}>
+								<ErrorBanner tone='info' message='Hold tight. We are sending your order to the kitchen.' />
+							</div>
+						)}
 
 						<button
 							onClick={handlePlaceOrder}
 							disabled={submitting || items.length === 0}
+							aria-busy={submitting}
 							className='bf-btn bf-btn-primary bf-btn-lg'
 							style={{ width: '100%', marginTop: 14, justifyContent: 'space-between' }}
 						>
-							<PlaceOrderBtn submitting={submitting} subtotal={subtotal} itemCount={items.reduce((s, i) => s + i.quantity, 0)} />
+							<PlaceOrderBtn submitting={submitting} subtotal={displaySubtotal} itemCount={displayItemCount} />
 						</button>
 
 						<div style={{ marginTop: 12, font: '500 11.5px var(--bf-font)', color: 'var(--bf-mute)', textAlign: 'center', lineHeight: 1.5 }}>
@@ -485,13 +555,24 @@ function CheckoutExperience() {
 						<ErrorBanner message={submitError} />
 					</div>
 				)}
+				{validationError && (
+					<div style={{ marginBottom: 8 }}>
+						<ErrorBanner message={validationError} />
+					</div>
+				)}
+				{!submitError && !validationError && items.length === 0 && (
+					<div style={{ marginBottom: 8 }}>
+						<ErrorBanner tone='info' message='Your cart is empty. Add items from the menu to continue.' />
+					</div>
+				)}
 				<button
 					onClick={handlePlaceOrder}
 					disabled={submitting || items.length === 0}
+					aria-busy={submitting}
 					className='bf-btn bf-btn-primary bf-btn-lg'
 					style={{ width: '100%', justifyContent: 'space-between' }}
 				>
-					<PlaceOrderBtn submitting={submitting} subtotal={subtotal} itemCount={items.reduce((s, i) => s + i.quantity, 0)} mobile />
+					<PlaceOrderBtn submitting={submitting} subtotal={displaySubtotal} itemCount={displayItemCount} mobile />
 				</button>
 			</div>
 		</div>

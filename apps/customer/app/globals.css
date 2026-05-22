@@ -904,6 +904,56 @@ a {
 	}
 	.bf-checkout-header {
 		padding: 14px 20px !important;
+		gap: 14px;
+		justify-content: flex-start !important;
+		overflow: hidden;
+	}
+	.bf-checkout-header .bf-logo {
+		font-size: 20px !important;
+	}
+	.bf-checkout-header .bf-logo small,
+	.bf-checkout-eta {
+		display: none !important;
+	}
+	.bf-checkout-stepper {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		justify-content: flex-end;
+		overflow: hidden;
+	}
+	.bf-checkout-stepper .bf-flow-stepper {
+		gap: 8px !important;
+		min-width: 0;
+	}
+	.bf-checkout-stepper .bf-flow-step-label,
+	.bf-checkout-stepper .bf-flow-step-rule {
+		display: none !important;
+	}
+	.bf-checkout-stepper .bf-flow-step[data-active='true'] .bf-flow-step-label {
+		display: inline !important;
+		max-width: 78px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+}
+
+@media (max-width: 639px) {
+	.bf-checkout-wrap {
+		padding: 26px 20px 110px !important;
+	}
+	.bf-checkout-form-col > h1 {
+		font-size: 36px !important;
+	}
+	.bf-checkout-form-col section {
+		padding: 20px !important;
+	}
+	.bf-checkout-address-grid {
+		grid-template-columns: 1fr !important;
+	}
+	.bf-checkout-wide-field {
+		grid-column: auto !important;
 	}
 }
 

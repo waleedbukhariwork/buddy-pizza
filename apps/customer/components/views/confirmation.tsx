@@ -12,9 +12,9 @@ import type { PlacedOrder } from '../../lib/hooks'
 function Stepper({ active }: { active: number }) {
 	const steps = ['Cart', 'Checkout', 'Confirmation']
 	return (
-		<div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+		<div className='bf-flow-stepper' style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
 			{steps.map((s, i) => (
-				<div key={i} style={{ display: 'flex', alignItems: 'center' }}>
+				<div key={i} className='bf-flow-step' data-active={i === active ? 'true' : undefined} data-done={i < active ? 'true' : undefined} style={{ display: 'flex', alignItems: 'center' }}>
 					<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
 						<span style={{
 							width: 22,
@@ -33,12 +33,12 @@ function Stepper({ active }: { active: number }) {
 								</svg>
 							) : i + 1}
 						</span>
-						<span style={{ font: i === active ? '700 13px var(--bf-font)' : '500 13px var(--bf-font)', color: i <= active ? 'var(--bf-ink)' : 'var(--bf-mute)' }}>
+						<span className='bf-flow-step-label' style={{ font: i === active ? '700 13px var(--bf-font)' : '500 13px var(--bf-font)', color: i <= active ? 'var(--bf-ink)' : 'var(--bf-mute)' }}>
 							{s}
 						</span>
 					</div>
 					{i < steps.length - 1 && (
-						<span style={{ width: 28, height: 1, background: 'var(--bf-line-2)', margin: '0 8px' }} />
+						<span className='bf-flow-step-rule' style={{ width: 28, height: 1, background: 'var(--bf-line-2)', margin: '0 8px' }} />
 					)}
 				</div>
 			))}
