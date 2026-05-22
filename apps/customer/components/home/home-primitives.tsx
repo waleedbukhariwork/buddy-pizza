@@ -6,6 +6,7 @@ import { FoodImg, type Tone } from '../ui/food-img'
 import { Icons } from '../ui/icon'
 import { rs, type Deal } from '../../lib/hooks'
 import { useCartStore } from '../../lib/cart-store'
+import { useAuthStore } from '../../lib/auth-store'
 
 function CheckIcon() {
 	return (
@@ -20,11 +21,16 @@ function DealCard({ d, tone = 'ember' }: { d: Deal; tone?: Tone }) {
 	const router = useRouter()
 	const addItem = useCartStore((s) => s.addItem)
 	const inCart = useCartStore((s) => s.items.some((i) => i.dealId === d.id))
+	const token = useAuthStore((s) => s.token)
 
 	const itemLines = d.items?.split('\n').filter(Boolean) ?? []
 
 	function handleAdd(e: React.MouseEvent) {
 		e.stopPropagation()
+		if (!token) {
+			router.push(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+			return
+		}
 		addItem({
 			productId: 0,
 			dealId: d.id,
@@ -110,7 +116,7 @@ function DealCard({ d, tone = 'ember' }: { d: Deal; tone?: Tone }) {
 						</button>
 					) : (
 						<button
-							className='bf-btn bf-btn-ink'
+							className='bf-btn bf-btn-primary'
 							onClick={handleAdd}
 							style={{ width: 32, height: 32, padding: 0, borderRadius: 999 }}
 						>

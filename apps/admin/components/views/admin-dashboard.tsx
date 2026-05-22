@@ -89,22 +89,9 @@ export function AdminDashboard() {
 				}
 				cta='New order'
 			/>
-			<div
-				style={{
-					padding: 28,
-					display: 'flex',
-					flexDirection: 'column',
-					gap: 24,
-				}}
-			>
+			<div className='bf-admin-page'>
 				{/* Metrics */}
-				<div
-					style={{
-						display: 'grid',
-						gridTemplateColumns: 'repeat(4, 1fr)',
-						gap: 14,
-					}}
-				>
+				<div className='bf-admin-metrics-grid'>
 					{metricsLoading ? (
 						Array.from({ length: 4 }).map((_, i) => (
 							<div key={i} className='bf-card' style={{ padding: 18 }}>
@@ -186,13 +173,7 @@ export function AdminDashboard() {
 				</div>
 
 				{/* Live orders + side cards */}
-				<div
-					style={{
-						display: 'grid',
-						gridTemplateColumns: '2fr 1fr',
-						gap: 18,
-					}}
-				>
+				<div className='bf-admin-dash-2col'>
 					<div className='bf-card' style={{ padding: 22 }}>
 						<div
 							style={{
@@ -212,109 +193,114 @@ export function AdminDashboard() {
 							</div>
 						</div>
 
-						{/* Table header */}
-						<div
-							style={{
-								display: 'grid',
-								gridTemplateColumns: '110px 1fr 1fr 80px 120px 80px',
-								gap: 12,
-								font: '600 10.5px var(--bf-mono)',
-								color: 'var(--bf-mute)',
-								letterSpacing: '.08em',
-								textTransform: 'uppercase',
-								padding: '0 8px 10px',
-								borderBottom: '1px solid var(--bf-line)',
-							}}
-						>
-							<span>ORDER</span>
-							<span>CUSTOMER</span>
-							<span>AREA</span>
-							<span>ITEMS</span>
-							<span>STATUS</span>
-							<span style={{ textAlign: 'right' }}>TOTAL</span>
-						</div>
-
-						{ordersLoading ? (
-							<div
-								style={{
-									display: 'flex',
-									flexDirection: 'column',
-									gap: 12,
-									padding: '14px 8px',
-								}}
-							>
-								{Array.from({ length: 4 }).map((_, i) => (
-									<div
-										key={i}
-										style={{
-											display: 'grid',
-											gridTemplateColumns: '110px 1fr 1fr 80px 120px 80px',
-											gap: 12,
-											alignItems: 'center',
-										}}
-									>
-										<Skeleton h={12} />
-										<Skeleton h={12} />
-										<Skeleton h={12} />
-										<Skeleton h={12} />
-										<Skeleton h={20} r={999} />
-										<Skeleton h={12} />
-									</div>
-								))}
-							</div>
-						) : ordersError ? (
-							<ErrorState
-								message='Could not load orders'
-								onRetry={retryOrders}
-							/>
-						) : liveOrders.length === 0 ? (
-							<div
-								style={{
-									padding: '32px 8px',
-									textAlign: 'center',
-									color: 'var(--bf-mute)',
-									fontSize: 13,
-								}}
-							>
-								No active orders right now
-							</div>
-						) : (
-							liveOrders.map((o, i) => (
+						{/* Table — scrollable on small screens */}
+						<div className='bf-admin-table-scroll'>
+							<div className='bf-admin-table-min'>
+								{/* Table header */}
 								<div
-									key={o.id}
 									style={{
 										display: 'grid',
 										gridTemplateColumns: '110px 1fr 1fr 80px 120px 80px',
 										gap: 12,
-										padding: '14px 8px',
-										borderBottom:
-											i < liveOrders.length - 1
-												? '1px solid var(--bf-line)'
-												: 'none',
-										alignItems: 'center',
-										font: '500 13px var(--bf-font)',
+										font: '600 10.5px var(--bf-mono)',
+										color: 'var(--bf-mute)',
+										letterSpacing: '.08em',
+										textTransform: 'uppercase',
+										padding: '0 8px 10px',
+										borderBottom: '1px solid var(--bf-line)',
 									}}
 								>
-									<span className='bf-mono' style={{ fontWeight: 700 }}>
-										{o.orderNumber ?? `#${o.id}`}
-									</span>
-									<span style={{ fontWeight: 600 }}>
-										{o.user?.name ?? o.customerPhone ?? '—'}
-									</span>
-									<span style={{ color: 'var(--bf-ink-2)' }}>
-										{shortAddress(o.deliveryAddress)}
-									</span>
-									<span className='bf-mono'>{o.items?.length ?? 0} items</span>
-									<StatusPill status={o.status} />
-									<span
-										className='bf-tabular'
-										style={{ textAlign: 'right', fontWeight: 700 }}
-									>
-										{rs(o.total ?? 0)}
-									</span>
+									<span>ORDER</span>
+									<span>CUSTOMER</span>
+									<span>AREA</span>
+									<span>ITEMS</span>
+									<span>STATUS</span>
+									<span style={{ textAlign: 'right' }}>TOTAL</span>
 								</div>
-							))
-						)}
+
+								{ordersLoading ? (
+									<div
+										style={{
+											display: 'flex',
+											flexDirection: 'column',
+											gap: 12,
+											padding: '14px 8px',
+										}}
+									>
+										{Array.from({ length: 4 }).map((_, i) => (
+											<div
+												key={i}
+												style={{
+													display: 'grid',
+													gridTemplateColumns: '110px 1fr 1fr 80px 120px 80px',
+													gap: 12,
+													alignItems: 'center',
+												}}
+											>
+												<Skeleton h={12} />
+												<Skeleton h={12} />
+												<Skeleton h={12} />
+												<Skeleton h={12} />
+												<Skeleton h={20} r={999} />
+												<Skeleton h={12} />
+											</div>
+										))}
+									</div>
+								) : ordersError ? (
+									<ErrorState
+										message='Could not load orders'
+										onRetry={retryOrders}
+									/>
+								) : liveOrders.length === 0 ? (
+									<div
+										style={{
+											padding: '32px 8px',
+											textAlign: 'center',
+											color: 'var(--bf-mute)',
+											fontSize: 13,
+										}}
+									>
+										No active orders right now
+									</div>
+								) : (
+									liveOrders.map((o, i) => (
+										<div
+											key={o.id}
+											style={{
+												display: 'grid',
+												gridTemplateColumns: '110px 1fr 1fr 80px 120px 80px',
+												gap: 12,
+												padding: '14px 8px',
+												borderBottom:
+													i < liveOrders.length - 1
+														? '1px solid var(--bf-line)'
+														: 'none',
+												alignItems: 'center',
+												font: '500 13px var(--bf-font)',
+											}}
+										>
+											<span className='bf-mono' style={{ fontWeight: 700 }}>
+												{o.orderNumber ?? `#${o.id}`}
+											</span>
+											<span style={{ fontWeight: 600 }}>
+												{o.user?.name ?? o.customerPhone ?? '—'}
+											</span>
+											<span style={{ color: 'var(--bf-ink-2)' }}>
+												{shortAddress(o.deliveryAddress)}
+											</span>
+											<span className='bf-mono'>{o.items?.length ?? 0} items</span>
+											<StatusPill status={o.status} />
+											<span
+												className='bf-tabular'
+												style={{ textAlign: 'right', fontWeight: 700 }}
+											>
+												{rs(o.total ?? 0)}
+											</span>
+										</div>
+									))
+								)}
+							</div>
+						</div>
 					</div>
 
 					<div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>

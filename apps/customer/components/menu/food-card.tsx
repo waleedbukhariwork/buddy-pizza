@@ -6,6 +6,7 @@ import { FoodImg, type Tone } from '../ui/food-img'
 import { HotBadge } from '../ui/hot-badge'
 import { Icons } from '../ui/icon'
 import { useCartStore } from '../../lib/cart-store'
+import { useAuthStore } from '../../lib/auth-store'
 import { rs, type Product } from '../../lib/hooks'
 
 // ─── Animated checkmark icon ──────────────────────────────────────────────────
@@ -258,6 +259,7 @@ function FoodCard({
 	})
 
 	const router = useRouter()
+	const token = useAuthStore((s) => s.token)
 	const [showPicker, setShowPicker] = useState(false)
 	const [added, setAdded] = useState(false)
 	const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -297,6 +299,10 @@ function FoodCard({
 
 	function handleAdd(e: React.MouseEvent) {
 		e.stopPropagation()
+		if (!token) {
+			router.push(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+			return
+		}
 		if (hasSizes) {
 			setShowPicker(true)
 		} else {
@@ -351,7 +357,7 @@ function FoodCard({
 						) : !hasSizes && cartQty > 0 ? (
 							<CardStepper key={`stepper-${item.id}`} qty={cartQty} onDecrement={handleDecrement} onIncrement={handleIncrement} />
 						) : (
-							<button type='button' className='bf-btn bf-btn-ink' onClick={handleAdd} style={{ width: 32, height: 32, padding: 0, borderRadius: 999 }}>
+							<button type='button' className='bf-btn bf-btn-primary' onClick={handleAdd} style={{ width: 32, height: 32, padding: 0, borderRadius: 999 }}>
 								{Icons.plus}
 							</button>
 						)}
@@ -525,7 +531,7 @@ function FoodCard({
 							/>
 						) : (
 							<button
-								className='bf-btn bf-btn-ink'
+								className='bf-btn bf-btn-primary'
 								onClick={handleAdd}
 								style={{ width: 32, height: 32, padding: 0, borderRadius: 999 }}
 							>

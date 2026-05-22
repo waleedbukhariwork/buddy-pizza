@@ -73,7 +73,7 @@ function SearchDropdown({
 						role='option'
 						aria-selected={activeIdx === i}
 						className={`bf-search-dropdown-item${activeIdx === i ? ' active' : ''}`}
-						onMouseDown={(e) => {
+						onPointerDown={(e) => {
 							e.preventDefault()
 							onSelect(item.label)
 						}}
@@ -97,7 +97,7 @@ function SearchDropdown({
 				))}
 
 			{showClearRecents && onClearRecents && (
-				<button type='button' className='bf-search-dropdown-clear' onMouseDown={(e) => { e.preventDefault(); onClearRecents() }}>
+				<button type='button' className='bf-search-dropdown-clear' onPointerDown={(e) => { e.preventDefault(); onClearRecents() }}>
 					Clear recent searches
 				</button>
 			)}

@@ -130,7 +130,8 @@ function MenuExperience() {
 
 	// Sync category strip top with header hide/show
 	useEffect(() => {
-		const header = document.querySelector('.bf-smart-header') as HTMLElement | null
+		const header = Array.from(document.querySelectorAll('.bf-smart-header'))
+			.find(el => (el as HTMLElement).offsetParent !== null) as HTMLElement | null
 		if (header) headerH.current = header.offsetHeight
 		function onScroll() {
 			const y = window.scrollY
@@ -235,8 +236,8 @@ function MenuExperience() {
 							{/* Left fade + scroll arrow */}
 							{canScrollLeft && (
 								<>
-									<div style={{ position: 'absolute', left: 56, top: 10, bottom: 0, width: 72, background: 'linear-gradient(to right, var(--bf-cream) 35%, transparent)', zIndex: 1, pointerEvents: 'none' }} />
-									<button className='bf-cat-scroll-btn' onClick={() => scrollCats('left')} style={{ position: 'absolute', left: 60, top: '50%', transform: 'translateY(-65%)', zIndex: 2 }}>
+									<div style={{ position: 'absolute', left: 'var(--bf-page-pad)', top: 10, bottom: 0, width: 72, background: 'linear-gradient(to right, var(--bf-cream) 35%, transparent)', zIndex: 1, pointerEvents: 'none' }} />
+									<button className='bf-cat-scroll-btn' onClick={() => scrollCats('left')} style={{ position: 'absolute', left: 'calc(var(--bf-page-pad) + 4px)', top: '50%', transform: 'translateY(-65%)', zIndex: 2 }}>
 										<svg width={13} height={13} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round'><path d='M15 18l-6-6 6-6' /></svg>
 									</button>
 								</>
@@ -284,8 +285,8 @@ function MenuExperience() {
 							{/* Right fade + scroll arrow */}
 							{canScrollRight && (
 								<>
-									<div style={{ position: 'absolute', right: 56, top: 10, bottom: 0, width: 72, background: 'linear-gradient(to left, var(--bf-cream) 35%, transparent)', zIndex: 1, pointerEvents: 'none' }} />
-									<button className='bf-cat-scroll-btn' onClick={() => scrollCats('right')} style={{ position: 'absolute', right: 60, top: '50%', transform: 'translateY(-65%)', zIndex: 2 }}>
+									<div style={{ position: 'absolute', right: 'var(--bf-page-pad)', top: 10, bottom: 0, width: 72, background: 'linear-gradient(to left, var(--bf-cream) 35%, transparent)', zIndex: 1, pointerEvents: 'none' }} />
+									<button className='bf-cat-scroll-btn' onClick={() => scrollCats('right')} style={{ position: 'absolute', right: 'calc(var(--bf-page-pad) + 4px)', top: '50%', transform: 'translateY(-65%)', zIndex: 2 }}>
 										<svg width={13} height={13} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round'><path d='M9 18l6-6-6-6' /></svg>
 									</button>
 								</>
@@ -368,7 +369,7 @@ function MenuExperience() {
 										{Array.from({ length: 6 }).map((_, i) => <Skel key={i} h={118} />)}
 									</div>
 								) : (
-									<div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+									<div className='bf-menu-products-grid'>
 										{Array.from({ length: 12 }).map((_, i) => <Skel key={i} h={220} />)}
 									</div>
 								)
@@ -408,7 +409,7 @@ function MenuExperience() {
 											{searchData.content.map((it, i) => <FoodCard key={it.id} item={it} variant='list' tone={TONES[i % 3]} />)}
 										</div>
 									) : (
-										<div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+										<div className='bf-menu-products-grid'>
 											{searchData.content.map((it, i) => <FoodCard key={it.id} item={it} variant='grid' tone={TONES[i % 3]} />)}
 										</div>
 									)}

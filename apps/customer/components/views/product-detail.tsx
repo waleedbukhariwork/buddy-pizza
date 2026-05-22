@@ -8,6 +8,7 @@ import { HotBadge } from '../ui/hot-badge'
 import { Icons } from '../ui/icon'
 import { rs, useProducts, type Product } from '../../lib/hooks'
 import { useCartStore } from '../../lib/cart-store'
+import { useAuthStore } from '../../lib/auth-store'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getSizeOptions(p: Product): { label: string; price: number }[] {
@@ -248,6 +249,7 @@ function ProductDetailPage({ productId }: { productId: number }) {
 	const router = useRouter()
 	const { data: products, isLoading } = useProducts()
 	const addItem = useCartStore((s) => s.addItem)
+	const token = useAuthStore((s) => s.token)
 
 	const product = products?.find((p) => p.id === productId)
 	const sizes = product ? getSizeOptions(product) : []
@@ -278,6 +280,10 @@ function ProductDetailPage({ productId }: { productId: number }) {
 
 	function handleAdd() {
 		if (!product || !product.isAvailable) return
+		if (!token) {
+			router.push(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+			return
+		}
 		addItem({
 			productId: product.id,
 			productName: product.name,

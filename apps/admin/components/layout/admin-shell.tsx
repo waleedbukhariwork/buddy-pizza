@@ -26,6 +26,9 @@ const NAV_ICONS: Record<string, React.ReactNode> = {
 	reports: Icons.trend,
 }
 
+// All nav items shown on mobile bottom nav
+const MOBILE_NAV_ITEMS = NAV_ITEMS
+
 export function AdminShell({
 	children,
 	active,
@@ -86,28 +89,12 @@ export function AdminShell({
 	}
 
 	return (
-		<div
-			style={{
-				display: 'grid',
-				gridTemplateColumns: '220px 1fr',
-				minHeight: '100vh',
-				background: 'var(--bf-cream)',
-			}}
-		>
-			<aside
-				style={{
-					background: 'var(--bf-ink)',
-					color: '#fff',
-					padding: '24px 16px',
-					display: 'flex',
-					flexDirection: 'column',
-					gap: 4,
-					position: 'sticky',
-					top: 0,
-					height: '100vh',
-				}}
-			>
+		<div className='bf-admin-layout'>
+			{/* ── Sidebar (desktop/tablet) ── */}
+			<aside className='bf-admin-sidebar'>
 				<Logo mono tag='ADMIN' />
+
+				{/* Nav items */}
 				<div
 					style={{
 						marginTop: 28,
@@ -118,60 +105,44 @@ export function AdminShell({
 				>
 					{NAV_ITEMS.map((n) => {
 						const badge = n.id === 'orders' ? newOrderCount : 0
+						const isActive = activeId === n.id
 						return (
 							<Link
 								key={n.id}
 								href={n.href}
+								title={n.label}
 								style={{
 									display: 'flex',
 									alignItems: 'center',
 									gap: 10,
 									padding: '10px 12px',
 									borderRadius: 8,
-									background:
-										activeId === n.id
-											? 'rgba(255,255,255,.08)'
-											: 'transparent',
-									color:
-										activeId === n.id ? '#fff' : 'rgba(255,255,255,.62)',
+									background: isActive
+										? 'rgba(255,255,255,.08)'
+										: 'transparent',
+									color: isActive ? '#fff' : 'rgba(255,255,255,.62)',
 									font: '600 13px var(--bf-font)',
 									textDecoration: 'none',
-									boxShadow:
-										activeId === n.id
-											? 'inset 2px 0 0 var(--bf-ember)'
-											: 'none',
+									boxShadow: isActive
+										? 'inset 2px 0 0 var(--bf-ember)'
+										: 'none',
+									justifyContent: 'flex-start',
 								}}
 							>
 								{NAV_ICONS[n.id]}
-								<span style={{ flex: 1 }}>{n.label}</span>
+								<span className='bf-admin-sidebar-label'>{n.label}</span>
 								{badge > 0 && (
-									<span
-										style={{
-											background: 'var(--bf-ember)',
-											color: '#fff',
-											font: '700 10px var(--bf-mono)',
-											padding: '2px 6px',
-											borderRadius: 999,
-										}}
-									>
-										{badge}
-									</span>
+									<span className='bf-admin-sidebar-badge'>{badge}</span>
 								)}
 							</Link>
 						)
 					})}
 				</div>
+
 				<div style={{ flex: 1 }} />
-				<div
-					style={{
-						padding: 12,
-						borderRadius: 8,
-						background: 'rgba(255,255,255,.06)',
-						display: 'flex',
-						gap: 10,
-						alignItems: 'center',
-					}}
-				>
+
+				{/* User footer */}
+				<div className='bf-admin-sidebar-user'>
 					<div
 						style={{
 							width: 36,
@@ -187,7 +158,7 @@ export function AdminShell({
 					>
 						A
 					</div>
-					<div style={{ flex: 1, minWidth: 0 }}>
+					<div className='bf-admin-sidebar-user-info' style={{ flex: 1, minWidth: 0 }}>
 						<div style={{ font: '700 13px var(--bf-font)', color: '#fff' }}>
 							Admin
 						</div>
@@ -200,7 +171,7 @@ export function AdminShell({
 					</div>
 					<button
 						onClick={logout}
-						className='bf-btn bf-btn-ghost bf-btn-icon'
+						className='bf-btn bf-btn-ghost bf-btn-icon bf-admin-sidebar-logout'
 						style={{
 							color: 'rgba(255,255,255,.45)',
 							width: 28,
@@ -212,12 +183,58 @@ export function AdminShell({
 					</button>
 				</div>
 			</aside>
+
+			{/* ── Main content ── */}
 			<main
 				style={{ overflow: 'auto', minHeight: '100vh' }}
 				className='bf-scroll'
 			>
 				{children}
 			</main>
+
+			{/* ── Mobile bottom navigation ── */}
+			<nav className='bf-admin-bottom-nav'>
+				{MOBILE_NAV_ITEMS.map((n) => {
+					const isActive = activeId === n.id
+					const badge = n.id === 'orders' ? newOrderCount : 0
+					return (
+						<Link
+							key={n.id}
+							href={n.href}
+							className={`bf-admin-mobile-tab${isActive ? ' active' : ''}`}
+						>
+							<span style={{ position: 'relative', display: 'flex' }}>
+								{NAV_ICONS[n.id]}
+								{badge > 0 && (
+									<span
+										style={{
+											position: 'absolute',
+											top: -5,
+											right: -8,
+											background: 'var(--bf-ember)',
+											color: '#fff',
+											fontSize: 9,
+											fontWeight: 700,
+											minWidth: 15,
+											height: 15,
+											borderRadius: 999,
+											display: 'flex',
+											alignItems: 'center',
+											justifyContent: 'center',
+											padding: '0 3px',
+											border: '1.5px solid var(--bf-ink)',
+											fontFamily: 'var(--bf-mono)',
+										}}
+									>
+										{badge}
+									</span>
+								)}
+							</span>
+							<span className='bf-admin-mobile-tab-label'>{n.label}</span>
+						</Link>
+					)
+				})}
+			</nav>
 		</div>
 	)
 }

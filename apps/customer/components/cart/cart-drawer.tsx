@@ -6,6 +6,7 @@ import { FoodImg, type Tone } from '../ui/food-img'
 import { QtyStepper } from '../ui/qty-stepper'
 import { CartTotals } from '../ui/cart-totals'
 import { useCartStore } from '../../lib/cart-store'
+import { useAuthStore } from '../../lib/auth-store'
 import { useProducts, rs } from '../../lib/hooks'
 
 // ─── Cart item row (used on confirmation page too) ────────────────────────────
@@ -43,6 +44,7 @@ function UpsellRow() {
 	const { data: products } = useProducts()
 	const cartItems = useCartStore((s) => s.items)
 	const addItem = useCartStore((s) => s.addItem)
+	const token = useAuthStore((s) => s.token)
 	const cartIds = new Set(cartItems.map((i) => i.productId))
 
 	const suggestions = products
@@ -79,7 +81,7 @@ function UpsellRow() {
 								{rs(p.price)}
 							</span>
 							<button
-								onClick={() => addItem({ productId: p.id, productName: p.name, price: p.price, quantity: 1 })}
+								onClick={() => token && addItem({ productId: p.id, productName: p.name, price: p.price, quantity: 1 })}
 								className='bf-upsell-add'
 								style={{
 									width: 24,

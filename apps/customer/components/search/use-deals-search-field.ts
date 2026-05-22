@@ -78,14 +78,19 @@ export function useDealsSearchField(activeDeals: Deal[], options?: {
 	}, [])
 
 	useEffect(() => {
-		function onMouseDown(e: MouseEvent) {
-			if (searchWrapRef.current && !searchWrapRef.current.contains(e.target as Node)) {
+		function onOutside(e: MouseEvent | TouchEvent) {
+			const target = e instanceof TouchEvent ? e.touches[0]?.target : (e as MouseEvent).target
+			if (searchWrapRef.current && target && !searchWrapRef.current.contains(target as Node)) {
 				setShowDropdown(false)
 				setActiveIdx(-1)
 			}
 		}
-		document.addEventListener('mousedown', onMouseDown)
-		return () => document.removeEventListener('mousedown', onMouseDown)
+		document.addEventListener('mousedown', onOutside)
+		document.addEventListener('touchstart', onOutside, { passive: true })
+		return () => {
+			document.removeEventListener('mousedown', onOutside)
+			document.removeEventListener('touchstart', onOutside)
+		}
 	}, [])
 
 	const commitSearch = useCallback(

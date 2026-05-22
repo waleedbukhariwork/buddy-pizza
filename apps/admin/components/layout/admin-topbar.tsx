@@ -15,38 +15,17 @@ export function AdminTopbar({
 	onCta?: () => void
 }) {
 	return (
-		<div
-			style={{
-				padding: '20px 32px',
-				borderBottom: '1px solid var(--bf-line)',
-				display: 'flex',
-				justifyContent: 'space-between',
-				alignItems: 'center',
-				background: 'var(--bf-cream)',
-				position: 'sticky',
-				top: 0,
-				zIndex: 4,
-			}}
-		>
+		<div className='bf-admin-topbar'>
 			<div>
-				<div className='bf-eyebrow'>{sub}</div>
-				<h1
-					style={{
-						fontWeight: 800,
-						fontSize: 28,
-						margin: '4px 0 0',
-						letterSpacing: '-0.028em',
-					}}
-				>
-					{title}
-				</h1>
+				<div className='bf-eyebrow bf-admin-topbar-sub'>{sub}</div>
+				<h1 className='bf-admin-topbar-title'>{title}</h1>
 			</div>
 			<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-				<div style={{ position: 'relative' }}>
+				<div className='bf-admin-topbar-search'>
 					<input
 						className='bf-input'
 						placeholder='Search…'
-						style={{ width: 220, paddingLeft: 36, height: 38 }}
+						style={{ paddingLeft: 36, height: 38 }}
 					/>
 					<span
 						style={{
@@ -60,7 +39,7 @@ export function AdminTopbar({
 					</span>
 				</div>
 				<button
-					className='bf-btn bf-btn-outline bf-btn-icon'
+					className='bf-btn bf-btn-outline bf-btn-icon bf-admin-topbar-bell'
 					style={{ position: 'relative' }}
 				>
 					{Icons.bell}
@@ -77,9 +56,15 @@ export function AdminTopbar({
 						}}
 					/>
 				</button>
-				<button className='bf-btn bf-btn-primary bf-btn-md' onClick={onCta}>
-					{Icons.plus} {cta || 'New item'}
-				</button>
+				{cta && (
+					<button
+						className='bf-btn bf-btn-primary bf-btn-md bf-admin-topbar-cta'
+						onClick={onCta}
+					>
+						{Icons.plus}
+						<span className='bf-admin-topbar-cta-label'>{cta}</span>
+					</button>
+				)}
 			</div>
 		</div>
 	)

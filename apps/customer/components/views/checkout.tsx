@@ -220,7 +220,7 @@ function CheckoutExperience() {
 
 			{/* ── Body ── */}
 			<div
-				className='bf-checkout-wrap'
+				className='bf-checkout-wrap bf-checkout-grid'
 				style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: 0, padding: '32px 56px 56px', maxWidth: 1280, margin: '0 auto' }}
 			>
 				{/* ── Form column ── */}

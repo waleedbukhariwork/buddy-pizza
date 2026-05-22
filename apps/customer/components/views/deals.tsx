@@ -122,7 +122,7 @@ function DealsExperience() {
 										? `${visible.length} RESULT${visible.length !== 1 ? 'S' : ''}`
 										: `${activeTag ? `${activeTag.toUpperCase()} · ` : ''}${visible.length} DEAL${visible.length !== 1 ? 'S' : ''}`}
 								</div>
-								<h1 style={{ fontWeight: 800, fontSize: 44, margin: '6px 0 0', letterSpacing: '-0.028em' }}>
+								<h1 style={{ fontWeight: 800, fontSize: 'clamp(28px, 8vw, 44px)', margin: '6px 0 0', letterSpacing: '-0.028em' }}>
 									{isSearchMode ? <>&ldquo;{searchQ}&rdquo;</> : (activeTag ?? 'All Deals')}
 								</h1>
 							</>
@@ -154,7 +154,7 @@ function DealsExperience() {
 
 					{/* ── Deals grid ── */}
 					{isLoading ? (
-						<div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+						<div className='bf-deals-grid-page' style={{ gap: 16 }}>
 							{Array.from({ length: 6 }).map((_, i) => <Skel key={i} h={340} />)}
 						</div>
 					) : activeDeals.length === 0 ? (

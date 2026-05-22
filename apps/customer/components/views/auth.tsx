@@ -18,36 +18,14 @@ interface InitiateResponse {
 // ─── Validation helpers ───────────────────────────────────────────────────────
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const PHONE_RE = /^(\+92|92|0)?3[0-9]{9}$/
-
-function detectType(value: string): 'email' | 'phone' | 'unknown' {
-	if (value.includes('@')) return 'email'
-	const stripped = value.replace(/[\s\-]/g, '')
-	if (/^[0-9+]/.test(stripped)) return 'phone'
-	return 'unknown'
-}
 
 function isValidEmail(v: string) {
 	return EMAIL_RE.test(v.trim())
 }
 
-function isValidPhone(v: string) {
-	return PHONE_RE.test(v.trim().replace(/[\s\-]/g, ''))
-}
-
-function isValidIdentifier(v: string) {
-	const t = detectType(v)
-	if (t === 'email') return isValidEmail(v)
-	if (t === 'phone') return isValidPhone(v)
-	return false
-}
-
-function maskIdentifier(identifier: string, type: string) {
-	if (type === 'EMAIL') {
-		const [local, domain] = identifier.split('@')
-		return local.slice(0, 2) + '****@' + domain
-	}
-	return identifier.slice(0, 4) + '****' + identifier.slice(-2)
+function maskIdentifier(identifier: string) {
+	const [local, domain] = identifier.split('@')
+	return local.slice(0, 2) + '****@' + domain
 }
 
 // ─── Auth shell ───────────────────────────────────────────────────────────────
@@ -202,6 +180,55 @@ function AuthPanel() {
 	)
 }
 
+// ─── Redirect context banner ──────────────────────────────────────────────────
+
+function getRedirectContext(redirect: string | null): { message: string; sub: string } | null {
+	if (!redirect) return null
+	if (redirect === '/checkout' || redirect.startsWith('/checkout'))
+		return { message: 'Sign in to place your order', sub: 'Your cart is ready — just one step away.' }
+	if (redirect.startsWith('/menu') || redirect.startsWith('/product'))
+		return { message: 'Sign in to add items to your cart', sub: 'Create an account to save favourites and order faster.' }
+	if (redirect.startsWith('/account') || redirect.startsWith('/profile'))
+		return { message: 'Sign in to view your account', sub: 'Access your orders, addresses, and preferences.' }
+	if (redirect.startsWith('/deals'))
+		return { message: 'Sign in to claim this deal', sub: 'Exclusive offers are waiting for you.' }
+	return { message: 'Sign in to continue', sub: 'You need to be logged in to access that page.' }
+}
+
+function RedirectBanner({ redirect }: { redirect: string | null }) {
+	const ctx = getRedirectContext(redirect)
+	if (!ctx) return null
+	return (
+		<div style={{
+			display: 'flex', alignItems: 'flex-start', gap: 12,
+			padding: '12px 14px', borderRadius: 12, marginBottom: 24,
+			background: 'rgba(232,67,31,.06)',
+			border: '1.5px solid rgba(232,67,31,.2)',
+		}}>
+			<div style={{
+				width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+				background: 'rgba(232,67,31,.12)',
+				display: 'flex', alignItems: 'center', justifyContent: 'center',
+				marginTop: 1,
+			}}>
+				<svg width={15} height={15} viewBox='0 0 24 24' fill='none'
+					stroke='var(--bf-ember)' strokeWidth={2.2} strokeLinecap='round' strokeLinejoin='round'>
+					<rect x='3' y='11' width='18' height='11' rx='2' />
+					<path d='M7 11V7a5 5 0 0 1 10 0v4' />
+				</svg>
+			</div>
+			<div style={{ minWidth: 0 }}>
+				<p style={{ fontSize: 13, fontWeight: 700, color: 'var(--bf-ember)', lineHeight: 1.3, marginBottom: 2 }}>
+					{ctx.message}
+				</p>
+				<p style={{ fontSize: 12, color: 'var(--bf-mute)', lineHeight: 1.4 }}>
+					{ctx.sub}
+				</p>
+			</div>
+		</div>
+	)
+}
+
 // ─── Shared sub-components ────────────────────────────────────────────────────
 
 function EyeIcon({ visible }: { visible: boolean }) {
@@ -283,12 +310,11 @@ function TabSwitcher({ active }: { active: 'signin' | 'signup' }) {
 
 interface OtpStepProps {
 	identifier: string
-	identifierType: string
 	onBack: () => void
 	onSuccess: (token: string, user: User | undefined) => void
 }
 
-function OtpStep({ identifier, identifierType, onBack, onSuccess }: OtpStepProps) {
+function OtpStep({ identifier, onBack, onSuccess }: OtpStepProps) {
 	const [digits, setDigits] = useState<string[]>(Array(6).fill(''))
 	const [timeLeft, setTimeLeft] = useState(120)
 	const [canResend, setCanResend] = useState(false)
@@ -390,7 +416,7 @@ function OtpStep({ identifier, identifierType, onBack, onSuccess }: OtpStepProps
 	}
 
 	const allFilled = digits.every((d) => d !== '')
-	const masked = maskIdentifier(identifier, identifierType)
+	const masked = maskIdentifier(identifier)
 
 	return (
 		<div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -421,10 +447,10 @@ function OtpStep({ identifier, identifierType, onBack, onSuccess }: OtpStepProps
 				<span style={{ fontWeight: 700, color: 'var(--bf-ink-2)' }}>{masked}</span>
 			</p>
 
-			{/* OTP digit boxes */}
+			{/* OTP digit boxes — flex:1 so they fill width on any phone size */}
 			<div
 				onPaste={handlePaste}
-				style={{ display: 'flex', gap: 10, marginBottom: 8, justifyContent: 'space-between' }}
+				style={{ display: 'flex', gap: 8, marginBottom: 8 }}
 			>
 				{digits.map((digit, i) => (
 					<input
@@ -439,9 +465,12 @@ function OtpStep({ identifier, identifierType, onBack, onSuccess }: OtpStepProps
 						onChange={(e) => handleDigitInput(i, e.target.value)}
 						onKeyDown={(e) => handleKeyDown(i, e)}
 						style={{
-							width: 52, height: 60,
+							flex: 1,
+							minWidth: 0,
+							maxWidth: 54,
+							height: 56,
 							textAlign: 'center',
-							fontSize: 22, fontWeight: 800,
+							fontSize: 20, fontWeight: 800,
 							fontFamily: 'var(--bf-mono)',
 							borderRadius: 12,
 							border: `2px solid ${
@@ -541,7 +570,9 @@ function AuthSignIn() {
 	const searchParams = useSearchParams()
 	const { setToken, setUser } = useAuthStore()
 
-	const [phoneOrEmail, setPhoneOrEmail] = useState('')
+	const redirect = searchParams.get('redirect')
+
+	const [email, setEmail] = useState('')
 	const [password, setPassword] = useState('')
 	const [showPw, setShowPw] = useState(false)
 	const [isLoading, setIsLoading] = useState(false)
@@ -553,7 +584,7 @@ function AuthSignIn() {
 		setIsLoading(true)
 		try {
 			const { data } = await apiClient.post<AuthResponse>('/v1/auth/customer/login', {
-				phoneOrEmail: phoneOrEmail.trim(),
+				phoneOrEmail: email.trim(),
 				password,
 			})
 			if (data.token) {
@@ -561,8 +592,7 @@ function AuthSignIn() {
 				if (data.user) localStorage.setItem('user', JSON.stringify(data.user))
 				setToken(data.token)
 				if (data.user) setUser(data.user)
-				const redirect = searchParams.get('redirect') ?? '/'
-				router.push(redirect)
+				router.push(redirect ?? '/')
 			}
 		} catch (err: unknown) {
 			const status = (err as { response?: { status?: number } })?.response?.status
@@ -572,7 +602,7 @@ function AuthSignIn() {
 			} else if (status === 401) {
 				setError('Incorrect password.')
 			} else if (status === 404) {
-				setError('No account found with that phone or email.')
+				setError('No account found with that email.')
 			} else {
 				setError(msg || 'Something went wrong. Please try again.')
 			}
@@ -600,19 +630,19 @@ function AuthSignIn() {
 						justifyContent: 'center', borderLeft: '1px solid var(--bf-line)',
 					}}
 				>
-					<TabSwitcher active='signin' />
+					<RedirectBanner redirect={redirect} />
 
 					<p style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--bf-ink)', marginBottom: 4 }}>
 						Welcome back
 					</p>
 					<p style={{ fontSize: 13.5, color: 'var(--bf-mute)', marginBottom: 28, lineHeight: 1.5 }}>
-						Good to see you again. Let's get your order going.
+						{redirect ? 'Sign in and we\'ll take you right back.' : 'Good to see you again. Let\'s get your order going.'}
 					</p>
 
 					<div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-						{/* Identifier */}
+						{/* Email */}
 						<div>
-							<FieldLabel>Phone or email</FieldLabel>
+							<FieldLabel>Email</FieldLabel>
 							<div style={{ position: 'relative' }}>
 								<span style={{
 									position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
@@ -620,17 +650,19 @@ function AuthSignIn() {
 								}}>
 									<svg width={16} height={16} viewBox='0 0 24 24' fill='none'
 										stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
-										<path d='M5 4h4l2 5-3 2a11 11 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z' />
+										<rect x='2' y='4' width='20' height='16' rx='2' />
+										<path d='M2 8l10 7 10-7' />
 									</svg>
 								</span>
 								<input
 									className='bf-input'
 									style={{ paddingLeft: 40 }}
-									placeholder='03001234567 or email@example.com'
-									value={phoneOrEmail}
-									onChange={(e) => { setPhoneOrEmail(e.target.value); setError(null) }}
+									type='email'
+									placeholder='email@example.com'
+									value={email}
+									onChange={(e) => { setEmail(e.target.value); setError(null) }}
 									required
-									autoComplete='username'
+									autoComplete='email'
 									autoFocus
 								/>
 							</div>
@@ -738,7 +770,7 @@ function AuthSignUp() {
 
 	// Step management
 	const [step, setStep] = useState<SignUpStep>('form')
-	const [otpData, setOtpData] = useState<{ identifier: string; identifierType: string } | null>(null)
+	const [otpData, setOtpData] = useState<{ identifier: string } | null>(null)
 
 	// Form fields
 	const [name, setName] = useState('')
@@ -750,8 +782,7 @@ function AuthSignUp() {
 	const [identifierTouched, setIdentifierTouched] = useState(false)
 
 	// Identifier validation state
-	const detectedType = detectType(identifier)
-	const identifierValid = isValidIdentifier(identifier)
+	const identifierValid = isValidEmail(identifier)
 	const identifierHasContent = identifier.trim().length > 0
 	const showIdentifierFeedback = identifierHasContent && identifierTouched
 
@@ -781,7 +812,7 @@ function AuthSignUp() {
 				identifier: identifier.trim().replace(/[\s\-]/g, ''),
 				password,
 			})
-			setOtpData({ identifier: data.identifier, identifierType: data.identifierType })
+			setOtpData({ identifier: data.identifier })
 			setStep('otp')
 		} catch (err: unknown) {
 			const status = (err as { response?: { status?: number } })?.response?.status
@@ -802,80 +833,18 @@ function AuthSignUp() {
 		router.push('/')
 	}
 
-	// Identifier icon
-	function IdentifierIcon() {
-		if (detectedType === 'email') {
-			return (
-				<svg width={16} height={16} viewBox='0 0 24 24' fill='none'
-					stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
-					<rect x='2' y='4' width='20' height='16' rx='2' />
-					<path d='M2 8l10 7 10-7' />
-				</svg>
-			)
-		}
-		return (
-			<svg width={16} height={16} viewBox='0 0 24 24' fill='none'
-				stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
-				<path d='M5 4h4l2 5-3 2a11 11 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z' />
-			</svg>
-		)
-	}
-
-	// Validation badge
-	function IdentifierBadge() {
+	function IdentifierHint() {
 		if (!showIdentifierFeedback) return null
 		if (identifierValid) {
 			return (
-				<span style={{
-					position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-					color: 'var(--bf-leaf)', display: 'flex', pointerEvents: 'none',
-				}}>
-					<svg width={18} height={18} viewBox='0 0 24 24' fill='none'
-						stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round'>
-						<path d='M20 6L9 17l-5-5' />
-					</svg>
-				</span>
-			)
-		}
-		return (
-			<span style={{
-				position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-				color: 'var(--bf-error)', display: 'flex', pointerEvents: 'none',
-			}}>
-				<svg width={18} height={18} viewBox='0 0 24 24' fill='none'
-					stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round'>
-					<line x1='18' y1='6' x2='6' y2='18' />
-					<line x1='6' y1='6' x2='18' y2='18' />
-				</svg>
-			</span>
-		)
-	}
-
-	function IdentifierHint() {
-		if (!showIdentifierFeedback) {
-			return (
-				<p style={{ marginTop: 5, fontSize: 12, color: 'var(--bf-mute)' }}>
-					Enter your email address or Pakistani phone number
-				</p>
-			)
-		}
-		if (identifierValid) {
-			return (
 				<p style={{ marginTop: 5, fontSize: 12, color: 'var(--bf-leaf)', fontWeight: 600 }}>
-					Valid {detectedType === 'email' ? 'email address' : 'phone number'}
-				</p>
-			)
-		}
-		if (detectedType === 'email') {
-			return (
-				<p style={{ marginTop: 5, fontSize: 12, color: 'var(--bf-error)', fontWeight: 600 }}>
-					Invalid email — check format (e.g. name@example.com)
+					Valid email address
 				</p>
 			)
 		}
 		return (
 			<p style={{ marginTop: 5, fontSize: 12, color: 'var(--bf-error)', fontWeight: 600 }}>
-				Invalid phone — use format 03001234567 or +923001234567
+				Invalid email — check format (e.g. name@example.com)
 			</p>
 		)
 	}
@@ -899,7 +868,6 @@ function AuthSignUp() {
 					}}>
 						<OtpStep
 							identifier={otpData.identifier}
-							identifierType={otpData.identifierType}
 							onBack={() => { setStep('form'); setError(null) }}
 							onSuccess={handleOtpSuccess}
 						/>
@@ -929,8 +897,6 @@ function AuthSignUp() {
 						justifyContent: 'center', borderLeft: '1px solid var(--bf-line)',
 					}}
 				>
-					<TabSwitcher active='signup' />
-
 					<p style={{ fontSize: 21, fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--bf-ink)', marginBottom: 4 }}>
 						Create your account
 					</p>
@@ -966,49 +932,39 @@ function AuthSignUp() {
 							</div>
 						</div>
 
-						{/* Email or Phone — smart unified input */}
+						{/* Email */}
 						<div>
-							<FieldLabel>
-								Email or phone{' '}
-								{detectedType !== 'unknown' && identifier.length > 0 && (
-									<span style={{
-										display: 'inline-flex', alignItems: 'center',
-										marginLeft: 6, padding: '1px 7px', borderRadius: 20,
-										fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em',
-										textTransform: 'uppercase',
-										background: detectedType === 'email' ? 'rgba(99,102,241,.12)' : 'rgba(16,185,129,.12)',
-										color: detectedType === 'email' ? '#6366f1' : '#10b981',
-									}}>
-										{detectedType === 'email' ? 'Email' : 'Phone'}
-									</span>
-								)}
-							</FieldLabel>
+							<FieldLabel>Email</FieldLabel>
 							<div style={{ position: 'relative' }}>
 								<span style={{
 									position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
 									color: 'var(--bf-mute)', display: 'flex', pointerEvents: 'none',
 								}}>
-									<IdentifierIcon />
+									<svg width={16} height={16} viewBox='0 0 24 24' fill='none'
+										stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
+										<rect x='2' y='4' width='20' height='16' rx='2' />
+										<path d='M2 8l10 7 10-7' />
+									</svg>
 								</span>
 								<input
 									className='bf-input'
 									style={{
-										paddingLeft: 40, paddingRight: 40,
+										paddingLeft: 40,
 										borderColor: showIdentifierFeedback && !identifierValid
 											? 'var(--bf-error)'
 											: showIdentifierFeedback && identifierValid
 											? 'var(--bf-leaf)'
 											: undefined,
 									}}
-									placeholder='03001234567 or name@example.com'
+									type='email'
+									placeholder='name@example.com'
 									value={identifier}
 									onChange={(e) => { setIdentifier(e.target.value); setError(null) }}
 									onBlur={() => setIdentifierTouched(true)}
 									required
-									autoComplete='off'
-									inputMode={detectedType === 'phone' ? 'tel' : 'email'}
+									autoComplete='email'
+									inputMode='email'
 								/>
-								<IdentifierBadge />
 							</div>
 							<IdentifierHint />
 						</div>

@@ -20,7 +20,7 @@ export function Logo({
 				className='bf-logo-dot'
 				style={mono ? { background: '#fff' } : undefined}
 			/>
-			Buddy Feast
+			<span className='bf-logo-text'>Buddy Feast</span>
 			<small
 				style={{
 					fontSize: '0.5em',

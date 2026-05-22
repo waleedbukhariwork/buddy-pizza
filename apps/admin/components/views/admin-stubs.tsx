@@ -7,7 +7,7 @@ export function AdminReports() {
 	return (
 		<AdminShell active='reports'>
 			<AdminTopbar title='Reports' sub='ANALYTICS & INSIGHTS' />
-			<div style={{ padding: 28 }}>
+			<div className='bf-admin-page'>
 				<p className='bf-eyebrow' style={{ marginBottom: 8 }}>Reports</p>
 				<p style={{ color: 'var(--bf-mute)', fontSize: 14 }}>Coming soon</p>
 			</div>
@@ -19,7 +19,7 @@ export function AdminRiders() {
 	return (
 		<AdminShell active='riders'>
 			<AdminTopbar title='Riders' sub='FLEET MANAGEMENT' />
-			<div style={{ padding: 28 }}>
+			<div className='bf-admin-page'>
 				<p className='bf-eyebrow' style={{ marginBottom: 8 }}>Riders</p>
 				<p style={{ color: 'var(--bf-mute)', fontSize: 14 }}>Coming soon</p>
 			</div>

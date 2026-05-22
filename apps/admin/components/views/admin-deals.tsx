@@ -392,17 +392,13 @@ function DealModal({ deal, products, onClose, onSaved }: {
 	}
 
 	return (
-		<div
-			style={{ position: 'fixed', inset: 0, background: 'rgba(35,31,32,.65)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 24 }}
-			onClick={onClose}
-		>
+		<div className='bf-admin-modal-wrap' onClick={onClose}>
 			<div
-				className='bf-card'
-				style={{ width: '100%', maxWidth: 900, maxHeight: '94vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderRadius: 22, padding: 0, boxShadow: '0 32px 80px rgba(35,31,32,.28)' }}
+				className='bf-admin-modal-inner'
 				onClick={e => e.stopPropagation()}
 			>
 				{/* Header */}
-				<div style={{ padding: '20px 28px 18px', borderBottom: '1px solid var(--bf-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+				<div className='bf-admin-modal-header'>
 					<div>
 						<div className='bf-eyebrow' style={{ marginBottom: 3 }}>{isNew ? 'CREATE DEAL' : 'EDIT DEAL'}</div>
 						<h2 style={{ fontWeight: 800, fontSize: 22, margin: 0, letterSpacing: '-0.025em' }}>
@@ -413,10 +409,10 @@ function DealModal({ deal, products, onClose, onSaved }: {
 				</div>
 
 				{/* Body: 2-column */}
-				<div style={{ flex: 1, overflowY: 'auto', display: 'flex', gap: 0 }} className='bf-scroll'>
+				<div className='bf-admin-modal-body bf-scroll'>
 
 					{/* Left: form */}
-					<div style={{ flex: 1, padding: '28px 28px', display: 'flex', flexDirection: 'column', gap: 24, overflowY: 'auto', minWidth: 0 }} className='bf-scroll'>
+					<div className='bf-admin-modal-form-col bf-scroll'>
 
 						{/* Identity */}
 						<div>
@@ -581,21 +577,14 @@ function DealModal({ deal, products, onClose, onSaved }: {
 						)}
 					</div>
 
-					{/* Right: live preview */}
-					<div style={{
-						width: 260, flexShrink: 0,
-						borderLeft: '1px solid var(--bf-line)',
-						background: 'var(--bf-cream-2)',
-						padding: 22, overflowY: 'auto',
-						position: 'sticky', top: 0, alignSelf: 'flex-start',
-						maxHeight: 'calc(94vh - 130px)',
-					}} className='bf-scroll'>
+					{/* Right: live preview (hidden on mobile) */}
+					<div className='bf-admin-modal-preview-col bf-scroll'>
 						<DealPreview form={form} items={selectedItems} />
 					</div>
 				</div>
 
 				{/* Footer */}
-				<div style={{ padding: '16px 28px', borderTop: '1px solid var(--bf-line)', display: 'flex', gap: 10, flexShrink: 0, background: 'var(--bf-cream-2)' }}>
+				<div className='bf-admin-modal-footer'>
 					<button className='bf-btn bf-btn-outline bf-btn-md' style={{ flex: 1 }} onClick={onClose} disabled={saving}>Cancel</button>
 					<button
 						className='bf-btn bf-btn-primary bf-btn-md'
@@ -740,10 +729,10 @@ export function AdminDeals() {
 				onCta={() => setModal('new')}
 			/>
 
-			<div style={{ padding: '28px 28px 48px' }}>
+			<div className='bf-admin-page' style={{ paddingBottom: 48 }}>
 				{/* Stats strip */}
 				{!isLoading && !error && all.length > 0 && (
-					<div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 28 }}>
+					<div className='bf-admin-stats-strip'>
 						{[
 							{ label: 'Total deals', value: all.length, accent: 'var(--bf-ink)' },
 							{ label: 'Active now', value: activeCount, accent: 'var(--bf-ember)' },
@@ -759,7 +748,7 @@ export function AdminDeals() {
 
 				{/* Grid */}
 				{isLoading ? (
-					<div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+					<div className='bf-admin-deals-grid'>
 						{Array.from({ length: 6 }).map((_, i) => (
 							<div key={i} className='bf-card' style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
 								<div style={{ display: 'flex', gap: 6 }}><Skeleton h={18} w={60} r={999} /><Skeleton h={18} w={80} r={999} /></div>
@@ -776,14 +765,14 @@ export function AdminDeals() {
 						<button className='bf-btn bf-btn-outline bf-btn-sm' onClick={() => mutate()}>Retry</button>
 					</div>
 				) : all.length === 0 ? (
-					<div style={{ textAlign: 'center', padding: '100px 0' }}>
+					<div style={{ textAlign: 'center', padding: '80px 0' }}>
 						<div style={{ fontSize: 44, marginBottom: 16, opacity: 0.18 }}>{Icons.pct}</div>
 						<h2 style={{ fontWeight: 800, fontSize: 22, marginBottom: 8 }}>No deals yet</h2>
 						<p style={{ color: 'var(--bf-mute)', fontSize: 14, marginBottom: 22 }}>Create your first deal to attract customers</p>
 						<button className='bf-btn bf-btn-primary bf-btn-md' onClick={() => setModal('new')}>{Icons.plus} Create first deal</button>
 					</div>
 				) : (
-					<div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+					<div className='bf-admin-deals-grid'>
 						{all.map(deal => (
 							<DealCard
 								key={deal.id}

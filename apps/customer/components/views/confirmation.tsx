@@ -232,7 +232,7 @@ function ConfirmationExperience() {
 					</p>
 				</div>
 
-				<div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 18, marginTop: 32 }}>
+				<div className='bf-confirmation-grid' style={{ display: 'grid', gap: 18, marginTop: 32 }}>
 					{/* ── Order + ETA card ── */}
 					<div className='bf-card bf-fade-up-1' style={{ padding: 22 }}>
 						<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

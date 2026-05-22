@@ -3,6 +3,8 @@
 @tailwind utilities;
 
 :root {
+	/* Responsive page horizontal padding — used by JS-positioned elements */
+	--bf-page-pad: 56px;
 	--bf-cream: #fff7ee;
 	--bf-cream-2: #f9eddb;
 	--bf-paper: #ffffff;
@@ -32,12 +34,17 @@
 	box-sizing: border-box;
 }
 
+html {
+	overflow-x: hidden;
+}
+
 body {
 	font-family: var(--bf-font);
 	color: var(--bf-ink);
 	background: var(--bf-cream);
 	-webkit-font-smoothing: antialiased;
 	text-rendering: optimizeLegibility;
+	overflow-x: hidden;
 }
 
 a {
@@ -607,7 +614,7 @@ a {
 
 .bf-cart-drawer-panel {
 	width: 460px;
-	max-width: 100vw;
+	max-width: 100%;
 	background: var(--bf-paper);
 	display: flex;
 	flex-direction: column;
@@ -633,14 +640,14 @@ a {
 	}
 }
 
-/* ─── Hide mobile-only elements on desktop ──────────────────────────────────── */
-@media (min-width: 768px) {
+/* ─── Hide mobile-only elements on desktop (≥960px) ─────────────────────────── */
+@media (min-width: 960px) {
 	.bf-bottom-nav  { display: none; }
 	.bf-cart-bar    { display: none !important; }
 }
 
-/* ─── Bottom padding so content clears bottom nav on mobile ─────────────────── */
-@media (max-width: 767px) {
+/* ─── Bottom padding so content clears bottom nav on mobile/tablet ───────────── */
+@media (max-width: 959px) {
 	.bf-shell-wrap { padding-bottom: 148px; }
 }
 
@@ -870,7 +877,7 @@ a {
 .bf-checkout-mobile-bar {
 	display: none;
 }
-@media (max-width: 767px) {
+@media (max-width: 959px) {
 	.bf-checkout-mobile-bar {
 		display: block;
 		position: fixed;
@@ -893,15 +900,15 @@ a {
 		padding-right: 0 !important;
 	}
 	.bf-checkout-wrap {
-		padding: 16px 16px 96px !important;
+		padding: 20px 20px 96px !important;
 	}
 	.bf-checkout-header {
-		padding: 14px 16px !important;
+		padding: 14px 20px !important;
 	}
 }
 
 /* ─── Auth page responsive ───────────────────────────────────────────────────── */
-@media (max-width: 767px) {
+@media (max-width: 639px) {
 	.bf-auth-grid {
 		grid-template-columns: 1fr !important;
 		max-width: 480px !important;
@@ -911,7 +918,7 @@ a {
 	}
 	.bf-auth-form-col {
 		border-left: none !important;
-		padding: 32px 24px !important;
+		padding: 32px 20px !important;
 	}
 }
 
@@ -1326,7 +1333,26 @@ a {
 	}
 }
 
-/* Mobile: stack + fixed CTA bar */
+/* Mobile + tablet-mobile: fixed CTA bar */
+@media (max-width: 959px) {
+	.bf-pd-cta-desktop {
+		display: none !important;
+	}
+	.bf-pd-mobile-bar {
+		display: block;
+		position: fixed;
+		bottom: calc(60px + env(safe-area-inset-bottom));
+		left: 0;
+		right: 0;
+		padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+		background: var(--bf-paper);
+		border-top: 1px solid var(--bf-line);
+		box-shadow: 0 -4px 24px rgba(35, 31, 32, 0.1);
+		z-index: 32;
+	}
+}
+
+/* Mobile only: stack + smaller image */
 @media (max-width: 767px) {
 	.bf-pd-wrap {
 		padding: 16px 20px 180px;
@@ -1343,28 +1369,19 @@ a {
 		padding: 9px 4px;
 		gap: 4px;
 	}
-	.bf-pd-cta-desktop {
-		display: none !important;
-	}
-	.bf-pd-mobile-bar {
-		display: block;
-		position: fixed;
-		bottom: calc(60px + env(safe-area-inset-bottom));
-		left: 0;
-		right: 0;
-		padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-		background: var(--bf-paper);
-		border-top: 1px solid var(--bf-line);
-		box-shadow: 0 -4px 24px rgba(35, 31, 32, 0.1);
-		z-index: 32;
-	}
 	.bf-pd-related-card {
 		width: 168px;
 		height: 276px;
 	}
-
 	.bf-pd-related-arrows {
 		display: none;
+	}
+}
+
+/* Tablet-mobile (768–959px): enough bottom clearance for the fixed CTA bar */
+@media (min-width: 768px) and (max-width: 959px) {
+	.bf-pd-wrap {
+		padding-bottom: 180px !important;
 	}
 }
 
@@ -2251,6 +2268,20 @@ div.bf-search-result {
 	}
 }
 
+/* ─── Mobile + tablet-mobile nav breakpoint (≤959px) ────────────────────────── */
+/* Desktop header hidden, mobile header + bottom nav shown up to 959px */
+@media (max-width: 959px) {
+	.bf-header-desktop {
+		display: none;
+	}
+	.bf-header-mobile {
+		display: flex;
+	}
+	.bf-menu-cat-strip {
+		top: 57px;
+	}
+}
+
 @media (max-width: 767px) {
 	.bf-container,
 	.bf-page-section,
@@ -2261,18 +2292,6 @@ div.bf-search-result {
 	.bf-footer-bar {
 		padding-left: 20px;
 		padding-right: 20px;
-	}
-
-	.bf-header-desktop {
-		display: none;
-	}
-
-	.bf-header-mobile {
-		display: flex;
-	}
-
-	.bf-menu-cat-strip {
-		top: 57px;
 	}
 
 	.bf-hero-grid {
@@ -2327,5 +2346,170 @@ div.bf-search-result {
 @media (min-width: 768px) {
 	.bf-search-back {
 		display: none;
+	}
+}
+
+/* ─── Tablet breakpoint (768–1023px): content layout ─────────────────────────── */
+@media (min-width: 768px) and (max-width: 1023px) {
+	/* Reduce horizontal padding on mid-size screens */
+	.bf-container,
+	.bf-page-section,
+	.bf-page-main,
+	.bf-hero,
+	.bf-menu-cat-strip-inner,
+	.bf-footer-trust,
+	.bf-footer-bar {
+		padding-left: 32px;
+		padding-right: 32px;
+	}
+
+	/* Hero: keep 2-col but reduce min-height */
+	.bf-hero-grid {
+		min-height: min(60vh, 520px);
+		gap: 28px;
+	}
+
+	.bf-hero-title {
+		font-size: clamp(30px, 5vw, 56px);
+	}
+
+	/* Menu products: 2 columns at tablet instead of 3 */
+	.bf-menu-products-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	/* Favourites: 3 → 2 columns */
+	.bf-favourites-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	/* Footer trust: keep 2 col for better readability */
+	.bf-footer-trust-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	/* Deals home: 2 col */
+	.bf-deals-grid-home {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+/* ─── Desktop-nav breakpoint (960–1023px): desktop header adjustments ─────────── */
+@media (min-width: 960px) and (max-width: 1023px) {
+	.bf-header-desktop {
+		padding: 14px 32px;
+	}
+	.bf-menu-cat-strip {
+		top: 57px;
+	}
+}
+
+/* ─── MOBILE SEARCH OVERLAY ───────────────────────────────────────────────── */
+@media (max-width: 767px) {
+	/* Full-screen fade-in instead of bottom-sheet slide (looks better on mobile) */
+	.bf-search-overlay-panel.bf-sheet-enter {
+		animation: bf-search-fade-in 0.2s ease-out both;
+	}
+
+	@keyframes bf-search-fade-in {
+		from { opacity: 0; transform: translateY(-8px); }
+		to   { opacity: 1; transform: translateY(0); }
+	}
+
+	/* Safe area top padding so content clears the notch */
+	.bf-search-overlay-panel {
+		padding-top: env(safe-area-inset-top);
+	}
+
+	/* Prevent iOS Safari auto-zoom on focus */
+	.bf-search-overlay-input-wrap input {
+		font-size: 16px !important;
+	}
+
+	/* Search results grids: 2 col on mobile */
+	.bf-menu-products-grid {
+		grid-template-columns: repeat(2, 1fr) !important;
+	}
+}
+
+/* ─── Confirmation Page Responsiveness ─── */
+.bf-confirmation-grid {
+	grid-template-columns: 1.1fr 1fr;
+}
+@media (max-width: 767px) {
+	.bf-confirmation-grid {
+		grid-template-columns: 1fr !important;
+	}
+}
+
+/* ─── CSS variable overrides for responsive page padding ─────────────────────── */
+/* Used by JS-positioned elements (menu scroll arrows) to match container padding */
+@media (min-width: 768px) and (max-width: 1023px) {
+	:root { --bf-page-pad: 32px; }
+}
+@media (max-width: 767px) {
+	:root { --bf-page-pad: 20px; }
+}
+
+/* ─── Hero search bar: prevent overflow on tiny phones ───────────────────────── */
+@media (max-width: 479px) {
+	.bf-hero-search {
+		padding: 4px 4px 4px 12px;
+	}
+	.bf-hero-search input {
+		font-size: 13px;
+		padding: 8px 8px;
+	}
+	.bf-hero-ctas {
+		flex-direction: column;
+		align-items: stretch;
+	}
+	.bf-hero-ctas .bf-btn {
+		justify-content: center;
+	}
+	.bf-hero-trust {
+		gap: 14px;
+	}
+}
+
+/* ─── Deals page title responsive ────────────────────────────────────────────── */
+@media (max-width: 767px) {
+	.bf-deals-page-title {
+		font-size: clamp(28px, 8vw, 44px) !important;
+	}
+}
+
+/* ─── Profile page padding on mobile ─────────────────────────────────────────── */
+@media (max-width: 639px) {
+	.bf-profile-main {
+		padding-left: 16px !important;
+		padding-right: 16px !important;
+	}
+}
+
+/* ─── Section row title responsive ───────────────────────────────────────────── */
+@media (max-width: 479px) {
+	.bf-section-title {
+		font-size: 22px !important;
+	}
+}
+
+/* ─── Cart drawer: prevent panel from going off-screen on very small phones ─── */
+@media (max-width: 359px) {
+	.bf-cart-drawer-panel {
+		border-radius: 16px 16px 0 0;
+	}
+}
+
+/* ─── Footer bar wrapping on mobile ──────────────────────────────────────────── */
+@media (max-width: 767px) {
+	.bf-footer-bar {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 12px;
+		padding: 24px 20px;
+	}
+	.bf-footer-links {
+		gap: 16px;
 	}
 }

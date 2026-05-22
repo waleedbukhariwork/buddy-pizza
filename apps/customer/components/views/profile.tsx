@@ -473,7 +473,7 @@ export function ProfileView() {
 			</div>
 
 			{/* ── Two-column layout ── */}
-			<div className='bf-profile-grid' style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20, alignItems: 'start' }}>
+			<div className='bf-profile-grid' style={{ display: 'grid', gap: 20, alignItems: 'start' }}>
 				{/* ── Left: Personal info + Password ── */}
 				<div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
@@ -801,6 +801,7 @@ export function ProfileView() {
 			{/* ── Inline styles (hover states for profile links) ── */}
 			<style>{`
 				.bf-profile-link:hover { background: var(--bf-cream); }
+				.bf-profile-grid { grid-template-columns: 1fr 280px; }
 				@media (max-width: 767px) {
 					.bf-profile-grid { grid-template-columns: 1fr !important; }
 				}

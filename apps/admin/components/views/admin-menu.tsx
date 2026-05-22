@@ -283,9 +283,7 @@ function SizeRowItem({ idx, total, size, form, onChange, onRemove }: {
 	const isRequired = idx < 2
 
 	return (
-		<div style={{
-			display: 'grid', gridTemplateColumns: '28px 1fr 130px 108px 28px',
-			gap: 10, alignItems: 'end', padding: '12px 16px',
+		<div className='bf-admin-size-row' style={{
 			borderBottom: idx < total - 1 ? '1px solid var(--bf-line)' : 'none',
 		}}>
 			{/* Index badge */}
@@ -337,7 +335,7 @@ function SizeRowItem({ idx, total, size, form, onChange, onRemove }: {
 			</div>
 
 			{/* Final price */}
-			<div>
+			<div className='bf-admin-size-row-final'>
 				{idx === 0 && <label className='bf-label' style={{ marginBottom: 4 }}>Final price</label>}
 				<div style={{
 					height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -363,7 +361,7 @@ function SizeRowItem({ idx, total, size, form, onChange, onRemove }: {
 			</div>
 
 			{/* Remove button */}
-			<div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 8 }}>
+			<div className='bf-admin-size-row-remove' style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 8 }}>
 				{total > 2 && (
 					<button
 						onClick={onRemove}
@@ -564,27 +562,13 @@ function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryC
 	const basePrice = form.pricingMode === 'sizes' ? (validSizes[0]?.price ?? 0) : form.price
 
 	return (
-		<div
-			style={{
-				position: 'fixed', inset: 0,
-				background: 'rgba(35,31,32,.65)', backdropFilter: 'blur(8px)',
-				display: 'flex', alignItems: 'center', justifyContent: 'center',
-				zIndex: 60, padding: 24,
-			}}
-			onClick={onClose}
-		>
+		<div className='bf-admin-modal-wrap' onClick={onClose}>
 			<div
-				className='bf-card'
-				style={{
-					width: '100%', maxWidth: 900, maxHeight: '94vh',
-					overflow: 'hidden', display: 'flex', flexDirection: 'column',
-					borderRadius: 22, padding: 0,
-					boxShadow: '0 32px 80px rgba(35,31,32,.28)',
-				}}
+				className='bf-admin-modal-inner'
 				onClick={e => e.stopPropagation()}
 			>
 				{/* Header */}
-				<div style={{ padding: '20px 28px 18px', borderBottom: '1px solid var(--bf-line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, background: 'var(--bf-paper)' }}>
+				<div className='bf-admin-modal-header'>
 					<div>
 						<div className='bf-eyebrow' style={{ marginBottom: 3 }}>{mode === 'add' ? 'ADD PRODUCT' : 'EDIT PRODUCT'}</div>
 						<h2 style={{ fontWeight: 800, fontSize: 22, margin: 0, letterSpacing: '-.025em' }}>
@@ -595,10 +579,10 @@ function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryC
 				</div>
 
 				{/* Body: 2-column */}
-				<div style={{ flex: 1, overflowY: 'auto', display: 'flex', gap: 0 }} className='bf-scroll'>
+				<div className='bf-admin-modal-body bf-scroll'>
 
 					{/* Left: form */}
-					<div style={{ flex: 1, padding: '28px', display: 'flex', flexDirection: 'column', gap: 26, overflowY: 'auto', minWidth: 0 }} className='bf-scroll'>
+					<div className='bf-admin-modal-form-col bf-scroll'>
 
 						{/* Section 1: Identity */}
 						<div>
@@ -707,15 +691,14 @@ function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryC
 								<div>
 									<div style={{ borderRadius: 14, border: '1px solid var(--bf-line)', overflow: 'hidden' }}>
 										{/* Header */}
-										<div style={{
-											display: 'grid', gridTemplateColumns: '28px 1fr 130px 108px 28px',
-											gap: 10, padding: '10px 16px',
-											background: 'var(--bf-cream-2)',
-											borderBottom: '1px solid var(--bf-line)',
-										}}>
+										<div className='bf-admin-size-header'>
 											<span />
-											{['SIZE NAME / LABEL', 'PRICE (Rs.)', 'FINAL PRICE', ''].map(h => (
-												<span key={h} style={{ font: '600 9.5px var(--bf-mono)', letterSpacing: '.08em', color: 'var(--bf-mute)', textTransform: 'uppercase' }}>{h}</span>
+											{(['SIZE NAME / LABEL', 'PRICE (Rs.)', 'FINAL PRICE', ''] as const).map((h) => (
+												<span
+													key={h}
+													className={h === 'FINAL PRICE' ? 'bf-admin-size-row-final' : undefined}
+													style={{ font: '600 9.5px var(--bf-mono)', letterSpacing: '.08em', color: 'var(--bf-mute)', textTransform: 'uppercase' }}
+												>{h}</span>
 											))}
 										</div>
 
@@ -797,21 +780,14 @@ function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryC
 						)}
 					</div>
 
-					{/* Right: preview */}
-					<div style={{
-						width: 260, flexShrink: 0,
-						borderLeft: '1px solid var(--bf-line)',
-						background: 'var(--bf-cream-2)',
-						padding: 22, overflowY: 'auto',
-						position: 'sticky', top: 0, alignSelf: 'flex-start',
-						maxHeight: 'calc(94vh - 130px)',
-					}} className='bf-scroll'>
+					{/* Right: preview (hidden on mobile) */}
+					<div className='bf-admin-modal-preview-col bf-scroll'>
 						<ProductPreview form={form} />
 					</div>
 				</div>
 
 				{/* Footer */}
-				<div style={{ padding: '16px 28px', borderTop: '1px solid var(--bf-line)', display: 'flex', gap: 10, flexShrink: 0, background: 'var(--bf-cream-2)' }}>
+				<div className='bf-admin-modal-footer'>
 					<button className='bf-btn bf-btn-outline bf-btn-md' style={{ flex: 1 }} onClick={onClose} disabled={saving}>Cancel</button>
 					<button className='bf-btn bf-btn-primary bf-btn-md' style={{ flex: 2 }} disabled={saving} onClick={handleSave}>
 						{saving ? 'Saving…' : mode === 'add' ? 'Add product →' : 'Save changes →'}
@@ -911,9 +887,23 @@ export function AdminMenu() {
 				}
 			/>
 
-			<div style={{ padding: 28, display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20 }}>
-				{/* Category sidebar */}
-				<div className='bf-card' style={{ padding: 12, height: 'fit-content' }}>
+			<div className='bf-admin-menu-layout'>
+				{/* Mobile: category select dropdown */}
+				<div className='bf-admin-cat-select-wrap'>
+					<label className='bf-label'>Category</label>
+					<select
+						className='bf-input'
+						value={activeCat ?? ''}
+						onChange={e => setSelectedCat(e.target.value || null)}
+					>
+						{categories.map(cat => (
+							<option key={cat.name} value={cat.name}>{cat.name}</option>
+						))}
+					</select>
+				</div>
+
+				{/* Category sidebar (desktop/tablet) */}
+				<div className='bf-card bf-admin-cat-sidebar' style={{ padding: 12, height: 'fit-content' }}>
 					<div className='bf-eyebrow' style={{ padding: '6px 10px 10px' }}>CATEGORIES</div>
 					{isLoading || categoriesLoading ? (
 						<div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 0' }}>
@@ -947,7 +937,7 @@ export function AdminMenu() {
 
 				{/* Items table */}
 				<div className='bf-card' style={{ padding: 0, overflow: 'hidden' }}>
-					<div style={{ padding: '16px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--bf-line)' }}>
+					<div style={{ padding: '16px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--bf-line)', gap: 12, flexWrap: 'wrap' }}>
 						<h2 style={{ fontWeight: 700, fontSize: 18, margin: 0 }}>
 							{activeCat ?? 'All items'} ·{' '}
 							<span className='bf-mono' style={{ fontWeight: 400, fontSize: 14 }}>{filteredProducts.length} items</span>
@@ -957,136 +947,140 @@ export function AdminMenu() {
 						</button>
 					</div>
 
-					{/* Table header */}
-					<div style={{
-						display: 'grid', gridTemplateColumns: '44px 64px 1.4fr 1fr 160px 110px 80px',
-						gap: 12, font: '600 10px var(--bf-mono)', color: 'var(--bf-mute)',
-						letterSpacing: '.08em', textTransform: 'uppercase',
-						padding: '10px 22px', borderBottom: '1px solid var(--bf-line)',
-						background: 'var(--bf-cream-2)',
-					}}>
-						<span /><span>IMAGE</span><span>NAME</span><span>CATEGORY</span>
-						<span>PRICE</span><span>STATUS</span>
-						<span style={{ textAlign: 'right' }}>ACTIONS</span>
-					</div>
+					{/* Scrollable table */}
+					<div className='bf-admin-menu-table-scroll'>
+						<div className='bf-admin-menu-table-min'>
+							{/* Table header */}
+							<div style={{
+								display: 'grid', gridTemplateColumns: '44px 64px 1.4fr 1fr 160px 110px 80px',
+								gap: 12, font: '600 10px var(--bf-mono)', color: 'var(--bf-mute)',
+								letterSpacing: '.08em', textTransform: 'uppercase',
+								padding: '10px 22px', borderBottom: '1px solid var(--bf-line)',
+								background: 'var(--bf-cream-2)',
+							}}>
+								<span /><span>IMAGE</span><span>NAME</span><span>CATEGORY</span>
+								<span>PRICE</span><span>STATUS</span>
+								<span style={{ textAlign: 'right' }}>ACTIONS</span>
+							</div>
 
-					{isLoading ? (
-						<div style={{ display: 'flex', flexDirection: 'column' }}>
-							{Array.from({ length: 4 }).map((_, i) => (
-								<div key={i} style={{
-									display: 'grid', gridTemplateColumns: '44px 64px 1.4fr 1fr 160px 110px 80px',
-									gap: 12, padding: '14px 22px', borderBottom: '1px solid var(--bf-line)', alignItems: 'center',
-								}}>
-									<Skeleton h={16} w={16} r={4} />
-									<Skeleton h={44} w={44} r={8} />
-									<div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-										<Skeleton h={13} w='80%' />
-										<Skeleton h={10} w='40%' />
-									</div>
-									<Skeleton h={13} w='70%' />
-									<Skeleton h={14} w={90} />
-									<Skeleton h={20} w={60} r={999} />
-									<div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-										<Skeleton h={28} w={28} r={999} />
-										<Skeleton h={28} w={28} r={999} />
-									</div>
+							{isLoading ? (
+								<div style={{ display: 'flex', flexDirection: 'column' }}>
+									{Array.from({ length: 4 }).map((_, i) => (
+										<div key={i} style={{
+											display: 'grid', gridTemplateColumns: '44px 64px 1.4fr 1fr 160px 110px 80px',
+											gap: 12, padding: '14px 22px', borderBottom: '1px solid var(--bf-line)', alignItems: 'center',
+										}}>
+											<Skeleton h={16} w={16} r={4} />
+											<Skeleton h={44} w={44} r={8} />
+											<div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+												<Skeleton h={13} w='80%' />
+												<Skeleton h={10} w='40%' />
+											</div>
+											<Skeleton h={13} w='70%' />
+											<Skeleton h={14} w={90} />
+											<Skeleton h={20} w={60} r={999} />
+											<div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+												<Skeleton h={28} w={28} r={999} />
+												<Skeleton h={28} w={28} r={999} />
+											</div>
+										</div>
+									))}
 								</div>
-							))}
-						</div>
-					) : error ? (
-						<div style={{ padding: 32, textAlign: 'center' }}>
-							<p style={{ color: 'var(--bf-mute)', fontSize: 13, marginBottom: 12 }}>Could not load products</p>
-							<button className='bf-btn bf-btn-outline bf-btn-sm' onClick={() => mutate()}>Retry</button>
-						</div>
-					) : filteredProducts.length === 0 ? (
-						<div style={{ padding: '48px 32px', textAlign: 'center' }}>
-							<p style={{ color: 'var(--bf-mute)', fontSize: 13, marginBottom: 14 }}>No items in this category</p>
-							<button className='bf-btn bf-btn-primary bf-btn-sm' onClick={() => setModal('add')}>
-								{Icons.plus} Add first item
-							</button>
-						</div>
-					) : (
-						filteredProducts.map((it, i) => {
-							const hasDis = (it.discountPct && it.discountPct > 0) || (it.discountAmount && it.discountAmount > 0)
-							const dm = discountModeFromProduct(it)
+							) : error ? (
+								<div style={{ padding: 32, textAlign: 'center' }}>
+									<p style={{ color: 'var(--bf-mute)', fontSize: 13, marginBottom: 12 }}>Could not load products</p>
+									<button className='bf-btn bf-btn-outline bf-btn-sm' onClick={() => mutate()}>Retry</button>
+								</div>
+							) : filteredProducts.length === 0 ? (
+								<div style={{ padding: '48px 32px', textAlign: 'center' }}>
+									<p style={{ color: 'var(--bf-mute)', fontSize: 13, marginBottom: 14 }}>No items in this category</p>
+									<button className='bf-btn bf-btn-primary bf-btn-sm' onClick={() => setModal('add')}>
+										{Icons.plus} Add first item
+									</button>
+								</div>
+							) : (
+								filteredProducts.map((it, i) => {
+									const hasDis = (it.discountPct && it.discountPct > 0) || (it.discountAmount && it.discountAmount > 0)
+									const dm = discountModeFromProduct(it)
 
-							// Compute display price
-							let displayBase = it.price
-							let sizeLabel = ''
-							if (it.hasSizes) {
-								try {
-									const sizes = it.sizesJson ? (JSON.parse(it.sizesJson) as ProductSize[]).filter(s => s.price && s.price > 0) : []
-									if (sizes.length > 0) {
-										displayBase = sizes[0].price ?? it.price
-										sizeLabel = 'From '
-									} else {
-										displayBase = it.priceSmall ?? it.price
-										sizeLabel = 'From '
+									let displayBase = it.price
+									let sizeLabel = ''
+									if (it.hasSizes) {
+										try {
+											const sizes = it.sizesJson ? (JSON.parse(it.sizesJson) as ProductSize[]).filter(s => s.price && s.price > 0) : []
+											if (sizes.length > 0) {
+												displayBase = sizes[0].price ?? it.price
+												sizeLabel = 'From '
+											} else {
+												displayBase = it.priceSmall ?? it.price
+												sizeLabel = 'From '
+											}
+										} catch {
+											displayBase = it.priceSmall ?? it.price
+											sizeLabel = 'From '
+										}
 									}
-								} catch {
-									displayBase = it.priceSmall ?? it.price
-									sizeLabel = 'From '
-								}
-							}
-							const eff = calcEffective(displayBase, dm, it.discountPct ?? null, it.discountAmount ?? null)
+									const eff = calcEffective(displayBase, dm, it.discountPct ?? null, it.discountAmount ?? null)
 
-							return (
-								<div
-									key={it.id}
-									style={{
-										display: 'grid', gridTemplateColumns: '44px 64px 1.4fr 1fr 160px 110px 80px',
-										gap: 12, padding: '12px 22px',
-										borderBottom: i < filteredProducts.length - 1 ? '1px solid var(--bf-line)' : 'none',
-										alignItems: 'center',
-									}}
-								>
-									<input type='checkbox' style={{ width: 15, height: 15, accentColor: 'var(--bf-ink)', cursor: 'pointer' }} />
-									<FoodImg tone={TONES[i % TONES.length]} style={{ width: 44, height: 44 }} />
-									<div>
-										<div style={{ font: '700 14px var(--bf-font)' }}>{it.name}</div>
-										<div className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)', marginTop: 2, display: 'flex', gap: 6 }}>
-											<span>ID-{it.id}</span>
-											{it.isHot && <span style={{ color: 'var(--bf-ember)' }}>🌶 HOT</span>}
-											{hasDis && <span style={{ color: '#15803d' }}>● DISC</span>}
-											{it.hasSizes && <span style={{ color: 'var(--bf-ink-2)' }}>SIZES</span>}
+									return (
+										<div
+											key={it.id}
+											style={{
+												display: 'grid', gridTemplateColumns: '44px 64px 1.4fr 1fr 160px 110px 80px',
+												gap: 12, padding: '12px 22px',
+												borderBottom: i < filteredProducts.length - 1 ? '1px solid var(--bf-line)' : 'none',
+												alignItems: 'center',
+											}}
+										>
+											<input type='checkbox' style={{ width: 15, height: 15, accentColor: 'var(--bf-ink)', cursor: 'pointer' }} />
+											<FoodImg tone={TONES[i % TONES.length]} style={{ width: 44, height: 44 }} />
+											<div>
+												<div style={{ font: '700 14px var(--bf-font)' }}>{it.name}</div>
+												<div className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)', marginTop: 2, display: 'flex', gap: 6 }}>
+													<span>ID-{it.id}</span>
+													{it.isHot && <span style={{ color: 'var(--bf-ember)' }}>🌶 HOT</span>}
+													{hasDis && <span style={{ color: '#15803d' }}>● DISC</span>}
+													{it.hasSizes && <span style={{ color: 'var(--bf-ink-2)' }}>SIZES</span>}
+												</div>
+											</div>
+											<span style={{ fontSize: 13, color: 'var(--bf-ink-2)' }}>{it.category}</span>
+											<div>
+												<div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+													{hasDis && (
+														<span className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)', textDecoration: 'line-through' }}>
+															Rs.{displayBase.toLocaleString('en-PK')}
+														</span>
+													)}
+													<span className='bf-tabular' style={{ fontWeight: 800, fontSize: 14 }}>
+														{sizeLabel && <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--bf-mute)' }}>{sizeLabel}</span>}
+														{rs(eff)}
+													</span>
+												</div>
+												{hasDis && (
+													<span style={{ fontSize: 10, fontWeight: 700, color: '#15803d', background: '#DCFCE7', padding: '1px 5px', borderRadius: 4 }}>
+														{it.discountPct ? `${it.discountPct}% off` : `Rs.${it.discountAmount} off`}
+													</span>
+												)}
+											</div>
+											<span>
+												{it.isAvailable ? (
+													<span className='bf-pill' style={{ background: '#DCFCE7', color: '#166534', boxShadow: 'none' }}>
+														<span className='bf-dot bf-dot-ready' /> LIVE
+													</span>
+												) : (
+													<span className='bf-pill' style={{ background: '#F1ECE3', color: 'var(--bf-mute)', boxShadow: 'none' }}>OFF</span>
+												)}
+											</span>
+											<div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+												<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 28, height: 28 }} onClick={() => setModal(it)}>{Icons.edit}</button>
+												<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 28, height: 28, color: 'var(--bf-ember)' }} onClick={() => setDeleteId(it.id)}>{Icons.trash}</button>
+											</div>
 										</div>
-									</div>
-									<span style={{ fontSize: 13, color: 'var(--bf-ink-2)' }}>{it.category}</span>
-									<div>
-										<div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-											{hasDis && (
-												<span className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)', textDecoration: 'line-through' }}>
-													Rs.{displayBase.toLocaleString('en-PK')}
-												</span>
-											)}
-											<span className='bf-tabular' style={{ fontWeight: 800, fontSize: 14 }}>
-												{sizeLabel && <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--bf-mute)' }}>{sizeLabel}</span>}
-												{rs(eff)}
-											</span>
-										</div>
-										{hasDis && (
-											<span style={{ fontSize: 10, fontWeight: 700, color: '#15803d', background: '#DCFCE7', padding: '1px 5px', borderRadius: 4 }}>
-												{it.discountPct ? `${it.discountPct}% off` : `Rs.${it.discountAmount} off`}
-											</span>
-										)}
-									</div>
-									<span>
-										{it.isAvailable ? (
-											<span className='bf-pill' style={{ background: '#DCFCE7', color: '#166534', boxShadow: 'none' }}>
-												<span className='bf-dot bf-dot-ready' /> LIVE
-											</span>
-										) : (
-											<span className='bf-pill' style={{ background: '#F1ECE3', color: 'var(--bf-mute)', boxShadow: 'none' }}>OFF</span>
-										)}
-									</span>
-									<div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-										<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 28, height: 28 }} onClick={() => setModal(it)}>{Icons.edit}</button>
-										<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 28, height: 28, color: 'var(--bf-ember)' }} onClick={() => setDeleteId(it.id)}>{Icons.trash}</button>
-									</div>
-								</div>
-							)
-						})
-					)}
+									)
+								})
+							)}
+						</div>
+					</div>
 				</div>
 			</div>
 

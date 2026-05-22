@@ -221,7 +221,20 @@ export function AdminOrders() {
 				}
 				cta='New order'
 			/>
-			<div style={{ padding: 28 }}>
+			<div className='bf-admin-page'>
+				{/* Hint on very small screens */}
+				<p
+					style={{
+						display: 'none',
+						fontSize: 11,
+						color: 'var(--bf-mute)',
+						marginBottom: 10,
+						fontFamily: 'var(--bf-mono)',
+					}}
+					className='bf-pipeline-scroll-hint'
+				>
+					← Swipe to see all columns →
+				</p>
 				{error ? (
 					<div className='bf-card' style={{ padding: 32, textAlign: 'center' }}>
 						<p style={{ color: 'var(--bf-mute)', fontSize: 13, marginBottom: 12 }}>
@@ -232,13 +245,7 @@ export function AdminOrders() {
 						</button>
 					</div>
 				) : (
-					<div
-						style={{
-							display: 'grid',
-							gridTemplateColumns: 'repeat(4, 1fr)',
-							gap: 14,
-						}}
-					>
+					<div className='bf-admin-pipeline'>
 						{PIPELINE_COLS.map((col) => {
 							const colOrders = (orders ?? []).filter(
 								(o) => o.status === col.id,
@@ -246,6 +253,7 @@ export function AdminOrders() {
 							return (
 								<div
 									key={col.id}
+									className='bf-admin-pipeline-col'
 									style={{
 										background: 'var(--bf-cream-2)',
 										borderRadius: 14,
