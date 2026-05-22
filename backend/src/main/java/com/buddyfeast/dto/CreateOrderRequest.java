@@ -19,6 +19,9 @@ public class CreateOrderRequest {
     @AllArgsConstructor
     public static class OrderItemRequest {
         private Long productId;
+        private Long dealId;
+        private String itemName;
+        private Double price;
         private Integer quantity;
         private String customizations;
     }

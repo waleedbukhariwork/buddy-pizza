@@ -7,26 +7,68 @@ import { Skeleton } from '../ui/skeleton'
 import { useDeals, useProducts, saveDeal, deleteDeal } from '../../lib/hooks'
 import type { Deal, Product } from '../../lib/types'
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+const FLAVOR_PRESETS = ['Peri Peri', 'BBQ', 'Tikka', 'Garlic', 'Original']
+const SIZE_LABELS = ['Small', 'Regular', 'Medium', 'Large', 'Family']
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface SelectedItem {
 	productId?: number
 	name: string
 	unitPrice: number
 	qty: number
+	size?: string | null
+	availableFlavors?: string[]
+	hasSizes?: boolean
 }
 
+// ─── Serialization (JSON format, backward-compat parse) ───────────────────────
 function serializeItems(items: SelectedItem[]): string {
-	return items.filter(i => i.name.trim()).map(i => `${i.qty}× ${i.name.trim()}`).join('\n')
+	return JSON.stringify(
+		items.filter(i => i.name.trim()).map(i => ({
+			productId: i.productId ?? null,
+			name: i.name.trim(),
+			qty: i.qty,
+			size: i.size ?? null,
+			availableFlavors: i.availableFlavors ?? [],
+			unitPrice: i.unitPrice,
+		}))
+	)
 }
 
 function parseToSelected(raw: string | null | undefined, products: Product[]): SelectedItem[] {
 	if (!raw?.trim()) return []
+	if (raw.trim().startsWith('[')) {
+		try {
+			const parsed = JSON.parse(raw) as Array<{
+				productId?: number | null; name: string; qty: number
+				size?: string | null; availableFlavors?: string[]; unitPrice: number
+			}>
+			return parsed.map(item => ({
+				productId: item.productId ?? undefined,
+				name: item.name,
+				qty: item.qty,
+				size: item.size ?? undefined,
+				availableFlavors: item.availableFlavors ?? [],
+				unitPrice: item.unitPrice,
+				hasSizes: products.find(p => p.id === (item.productId ?? undefined))?.hasSizes ?? false,
+			}))
+		} catch { /* fall through */ }
+	}
+	// Legacy \n format
 	return raw.split('\n').filter(Boolean).map(line => {
 		const m = line.match(/^(\d+)×\s*(.+)$/)
 		const qty = m ? parseInt(m[1]) : 1
 		const name = m ? m[2] : line
 		const product = products.find(p => p.name.toLowerCase() === name.toLowerCase())
-		return { productId: product?.id, name, unitPrice: product?.priceSmall ?? product?.price ?? 0, qty }
+		return {
+			productId: product?.id,
+			name,
+			unitPrice: product?.priceSmall ?? product?.price ?? 0,
+			qty,
+			availableFlavors: [],
+			hasSizes: product?.hasSizes ?? false,
+		}
 	})
 }
 
@@ -38,6 +80,31 @@ interface SavingsInfo { amount: number; pct: number }
 function getSavings(orig: number, deal: number | null): SavingsInfo | null {
 	if (!deal || !orig || orig <= deal) return null
 	return { amount: Math.round(orig - deal), pct: Math.round(((orig - deal) / orig) * 100) }
+}
+
+function toIso(val: string): string | null {
+	if (!val) return null
+	return val.length === 16 ? val + ':00' : val
+}
+
+function getExpiryInfo(expiresAt?: string | null): { text: string; color: string; bg: string } | null {
+	if (!expiresAt) return null
+	const diff = new Date(expiresAt).getTime() - Date.now()
+	if (diff < 0) return { text: 'Expired', color: '#dc2626', bg: '#fee2e2' }
+	const hours = Math.floor(diff / 3_600_000)
+	if (hours < 24) return { text: `Ends in ${hours}h`, color: '#92400e', bg: '#fef3c7' }
+	const days = Math.floor(hours / 24)
+	if (days <= 7) return { text: `Ends in ${days}d`, color: '#92400e', bg: '#fef3c7' }
+	return null
+}
+
+function getStartInfo(startsAt?: string | null): string | null {
+	if (!startsAt) return null
+	const diff = new Date(startsAt).getTime() - Date.now()
+	if (diff <= 0) return null
+	const hours = Math.floor(diff / 3_600_000)
+	if (hours < 24) return `Starts in ${hours}h`
+	return `Starts ${new Date(startsAt).toLocaleDateString('en-PK', { month: 'short', day: 'numeric' })}`
 }
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
@@ -96,7 +163,14 @@ function ProductPicker({ products, selected, onAdd }: {
 	}, [])
 
 	function handleSelect(p: Product) {
-		onAdd({ productId: p.id, name: p.name, unitPrice: p.priceSmall ?? p.price, qty: 1 })
+		onAdd({
+			productId: p.id,
+			name: p.name,
+			unitPrice: p.priceSmall ?? p.price,
+			qty: 1,
+			availableFlavors: [],
+			hasSizes: p.hasSizes ?? false,
+		})
 		setQuery('')
 		setOpen(false)
 	}
@@ -154,7 +228,7 @@ function ProductPicker({ products, selected, onAdd }: {
 									>
 										<div style={{ font: '600 13px var(--bf-font)', color: 'var(--bf-ink)' }}>{p.name}</div>
 										<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-											{p.isHot && <span style={{ fontSize: 10 }}>🌶</span>}
+											{p.hasSizes && <span style={{ fontSize: 10, color: 'var(--bf-mute)', fontWeight: 600 }}>sizes</span>}
 											<span className='bf-mono' style={{ fontSize: 12, fontWeight: 700, color: 'var(--bf-ember)' }}>
 												{p.hasSizes ? `From Rs.${basePrice}` : `Rs.${basePrice}`}
 											</span>
@@ -174,57 +248,186 @@ function ProductPicker({ products, selected, onAdd }: {
 	)
 }
 
+// ─── Item config panel (size + flavors) ───────────────────────────────────────
+function ItemConfigPanel({ item, onUpdate }: {
+	item: SelectedItem
+	onUpdate: (updates: Partial<SelectedItem>) => void
+}) {
+	const [flavorInput, setFlavorInput] = useState('')
+
+	function addCustomFlavor() {
+		const val = flavorInput.trim()
+		if (!val) return
+		const current = item.availableFlavors ?? []
+		if (!current.includes(val)) onUpdate({ availableFlavors: [...current, val] })
+		setFlavorInput('')
+	}
+
+	return (
+		<div style={{ padding: '14px 14px', borderTop: '1px solid var(--bf-line)', background: 'var(--bf-cream-2)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+			{/* Size selector (only if product hasSizes) */}
+			{item.hasSizes && (
+				<div>
+					<div style={{ fontSize: 10, fontWeight: 800, color: 'var(--bf-mute)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>
+						Size for this deal
+					</div>
+					<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+						{SIZE_LABELS.map(sz => (
+							<button
+								key={sz}
+								className={`bf-btn bf-btn-sm ${item.size === sz ? 'bf-btn-primary' : 'bf-btn-outline'}`}
+								style={{ padding: '5px 12px', fontSize: 12 }}
+								onClick={() => onUpdate({ size: item.size === sz ? null : sz })}
+							>{sz}</button>
+						))}
+					</div>
+				</div>
+			)}
+
+			{/* Flavor availability */}
+			<div>
+				<div style={{ fontSize: 10, fontWeight: 800, color: 'var(--bf-mute)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 4 }}>
+					Available flavors
+				</div>
+				<div style={{ fontSize: 11, color: 'var(--bf-mute)', marginBottom: 8 }}>
+					Customers pick one when ordering this deal
+				</div>
+				<div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
+					{FLAVOR_PRESETS.map(f => {
+						const isOn = item.availableFlavors?.includes(f) ?? false
+						return (
+							<button
+								key={f}
+								className={`bf-btn bf-btn-sm ${isOn ? 'bf-btn-primary' : 'bf-btn-outline'}`}
+								style={{ padding: '5px 10px', fontSize: 11.5 }}
+								onClick={() => {
+									const current = item.availableFlavors ?? []
+									onUpdate({ availableFlavors: isOn ? current.filter(x => x !== f) : [...current, f] })
+								}}
+							>{f}</button>
+						)
+					})}
+				</div>
+				<div style={{ display: 'flex', gap: 6 }}>
+					<input
+						className='bf-input'
+						style={{ flex: 1, height: 34, fontSize: 12 }}
+						value={flavorInput}
+						onChange={e => setFlavorInput(e.target.value)}
+						placeholder='Custom flavor…'
+						onKeyDown={e => { if (e.key === 'Enter') addCustomFlavor() }}
+					/>
+					<button className='bf-btn bf-btn-outline bf-btn-sm' style={{ height: 34 }} onClick={addCustomFlavor}>Add</button>
+				</div>
+				{(item.availableFlavors ?? []).filter(f => !FLAVOR_PRESETS.includes(f)).length > 0 && (
+					<div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
+						{(item.availableFlavors ?? []).filter(f => !FLAVOR_PRESETS.includes(f)).map(f => (
+							<span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', background: 'rgba(232,67,31,.1)', borderRadius: 999, fontSize: 11, fontWeight: 600, color: 'var(--bf-ember)' }}>
+								{f}
+								<button
+									style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit', lineHeight: 1, display: 'flex', fontSize: 14 }}
+									onClick={() => onUpdate({ availableFlavors: (item.availableFlavors ?? []).filter(x => x !== f) })}
+								>×</button>
+							</span>
+						))}
+					</div>
+				)}
+			</div>
+		</div>
+	)
+}
+
 // ─── Selected items list ──────────────────────────────────────────────────────
 function SelectedItemsList({ items, onChange }: { items: SelectedItem[]; onChange: (items: SelectedItem[]) => void }) {
+	const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
 	if (items.length === 0) return null
 	return (
 		<div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
-			{items.map((item, i) => (
-				<div key={i} style={{
-					display: 'flex', alignItems: 'center', gap: 10,
-					background: 'var(--bf-paper)', border: '1px solid var(--bf-line)',
-					borderRadius: 12, padding: '10px 14px',
-				}}>
-					<div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--bf-ember)', flexShrink: 0 }} />
-					<div style={{ flex: 1, font: '600 13px var(--bf-font)' }}>{item.name}</div>
-					<span className='bf-mono' style={{ fontSize: 10.5, color: 'var(--bf-mute)' }}>
-						Rs.{item.unitPrice.toLocaleString('en-PK')}/ea
-					</span>
-					<div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'var(--bf-cream-2)', borderRadius: 8, padding: '2px 4px' }}>
-						<button
-							className='bf-btn bf-btn-ghost bf-btn-icon'
-							style={{ width: 22, height: 22 }}
-							onClick={() => item.qty <= 1
-								? onChange(items.filter((_, j) => j !== i))
-								: onChange(items.map((it, j) => j === i ? { ...it, qty: it.qty - 1 } : it))
-							}
-						>{Icons.minus}</button>
-						<span style={{ width: 24, textAlign: 'center', font: '700 13px var(--bf-font)' }}>{item.qty}</span>
-						<button
-							className='bf-btn bf-btn-ghost bf-btn-icon'
-							style={{ width: 22, height: 22 }}
-							onClick={() => onChange(items.map((it, j) => j === i ? { ...it, qty: it.qty + 1 } : it))}
-						>{Icons.plus}</button>
+			{items.map((item, i) => {
+				const isExpanded = expandedIndex === i
+				const hasFlavors = (item.availableFlavors?.length ?? 0) > 0
+				return (
+					<div key={i} style={{
+						background: 'var(--bf-paper)',
+						border: `1px solid ${isExpanded ? 'var(--bf-ember)' : 'var(--bf-line)'}`,
+						borderRadius: 12, overflow: 'hidden', transition: 'border-color .15s',
+					}}>
+						<div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px' }}>
+							<div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--bf-ember)', flexShrink: 0 }} />
+							<div style={{ flex: 1, minWidth: 0 }}>
+								<div style={{ font: '600 13px var(--bf-font)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
+								{(item.size || hasFlavors) && (
+									<div style={{ fontSize: 10.5, color: 'var(--bf-mute)', marginTop: 2 }}>
+										{[item.size, hasFlavors ? item.availableFlavors!.join(', ') : null].filter(Boolean).join(' · ')}
+									</div>
+								)}
+							</div>
+							<span className='bf-mono' style={{ fontSize: 10.5, color: 'var(--bf-mute)', flexShrink: 0 }}>
+								Rs.{item.unitPrice.toLocaleString('en-PK')}/ea
+							</span>
+							<div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'var(--bf-cream-2)', borderRadius: 8, padding: '2px 4px', flexShrink: 0 }}>
+								<button
+									className='bf-btn bf-btn-ghost bf-btn-icon'
+									style={{ width: 22, height: 22 }}
+									onClick={() => item.qty <= 1
+										? onChange(items.filter((_, j) => j !== i))
+										: onChange(items.map((it, j) => j === i ? { ...it, qty: it.qty - 1 } : it))
+									}
+								>{Icons.minus}</button>
+								<span style={{ width: 24, textAlign: 'center', font: '700 13px var(--bf-font)' }}>{item.qty}</span>
+								<button
+									className='bf-btn bf-btn-ghost bf-btn-icon'
+									style={{ width: 22, height: 22 }}
+									onClick={() => onChange(items.map((it, j) => j === i ? { ...it, qty: it.qty + 1 } : it))}
+								>{Icons.plus}</button>
+							</div>
+							<span className='bf-mono' style={{ fontSize: 12, fontWeight: 700, minWidth: 72, textAlign: 'right', flexShrink: 0 }}>
+								Rs.{(item.unitPrice * item.qty).toLocaleString('en-PK')}
+							</span>
+							{/* Configure toggle */}
+							<button
+								className='bf-btn bf-btn-ghost bf-btn-icon'
+								style={{ width: 28, height: 28, color: isExpanded ? 'var(--bf-ember)' : 'var(--bf-mute)', flexShrink: 0 }}
+								onClick={() => setExpandedIndex(isExpanded ? null : i)}
+								title='Configure size & flavors'
+							>
+								<svg width={14} height={14} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
+									<path d='M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z'/>
+								</svg>
+							</button>
+							<button
+								className='bf-btn bf-btn-ghost bf-btn-icon'
+								style={{ width: 26, height: 26, color: 'var(--bf-ember)', flexShrink: 0 }}
+								onClick={() => { onChange(items.filter((_, j) => j !== i)); if (expandedIndex === i) setExpandedIndex(null) }}
+							>{Icons.x}</button>
+						</div>
+
+						{isExpanded && (
+							<ItemConfigPanel
+								item={item}
+								onUpdate={updates => onChange(items.map((it, j) => j === i ? { ...it, ...updates } : it))}
+							/>
+						)}
 					</div>
-					<span className='bf-mono' style={{ fontSize: 12, fontWeight: 700, minWidth: 72, textAlign: 'right' }}>
-						Rs.{(item.unitPrice * item.qty).toLocaleString('en-PK')}
-					</span>
-					<button
-						className='bf-btn bf-btn-ghost bf-btn-icon'
-						style={{ width: 26, height: 26, color: 'var(--bf-ember)', flexShrink: 0 }}
-						onClick={() => onChange(items.filter((_, j) => j !== i))}
-					>{Icons.x}</button>
-				</div>
-			))}
+				)
+			})}
 		</div>
 	)
 }
 
 // ─── Deal preview card ────────────────────────────────────────────────────────
 function DealPreview({ form, items }: { form: DealFormState; items: SelectedItem[] }) {
-	const itemLines = items.map(i => `${i.qty}× ${i.name}`)
+	const itemLines = items.map(i => {
+		const parts = [`${i.qty}× ${i.name}`]
+		if (i.size) parts.push(i.size)
+		if (i.availableFlavors?.length) parts.push(i.availableFlavors.join(', '))
+		return parts.join(' · ')
+	})
 	const sav = getSavings(form.originalPrice ?? 0, form.discountPrice)
 	const isEmpty = !form.title.trim()
+	const expiryInfo = getExpiryInfo(form.expiresAt)
+	const startInfo = getStartInfo(form.startsAt)
 
 	return (
 		<div>
@@ -233,12 +436,21 @@ function DealPreview({ form, items }: { form: DealFormState; items: SelectedItem
 				{/* Status bar */}
 				<div style={{ height: 4, background: form.isActive ? (form.isFeatured ? 'var(--bf-amber)' : 'var(--bf-ember)') : 'var(--bf-line)', transition: 'background .2s' }} />
 
+				{/* Deal image preview */}
+				{form.imageUrl && (
+					<div style={{ height: 90, overflow: 'hidden', background: 'var(--bf-cream-2)' }}>
+						<img src={form.imageUrl} alt='' style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }} />
+					</div>
+				)}
+
 				<div style={{ padding: '14px 14px 16px' }}>
 					{/* Badges */}
-					<div style={{ display: 'flex', gap: 5, marginBottom: 10, flexWrap: 'wrap' }}>
+					<div style={{ display: 'flex', gap: 5, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
 						{form.isFeatured && <span className='bf-pill' style={{ background: '#FEF9C3', color: '#713f12', boxShadow: 'none', fontSize: 9.5 }}>⭐ Featured</span>}
 						{form.tag && <span className='bf-pill bf-pill-ink' style={{ fontSize: 9.5 }}>{form.tag}</span>}
 						{form.badge && <span className='bf-pill bf-pill-ember' style={{ fontSize: 9.5 }}>{form.badge}</span>}
+						{expiryInfo && <span style={{ fontSize: 9.5, fontWeight: 600, color: expiryInfo.color, background: expiryInfo.bg, padding: '2px 7px', borderRadius: 999 }}>⏱ {expiryInfo.text}</span>}
+						{startInfo && !expiryInfo && <span style={{ fontSize: 9.5, fontWeight: 600, color: '#4338ca', background: 'rgba(79,70,229,.1)', padding: '2px 7px', borderRadius: 999 }}>📅 {startInfo}</span>}
 						<div style={{ marginLeft: 'auto' }}>
 							<span style={{ fontSize: 10, fontWeight: 600, color: form.isActive ? '#166534' : 'var(--bf-mute)' }}>
 								{form.isActive ? 'Active' : 'Paused'}
@@ -267,6 +479,16 @@ function DealPreview({ form, items }: { form: DealFormState; items: SelectedItem
 						</ul>
 					)}
 
+					{/* Quota preview */}
+					{form.maxOrders && (
+						<div style={{ marginBottom: 10 }}>
+							<div style={{ height: 4, background: 'var(--bf-line)', borderRadius: 999 }}>
+								<div style={{ height: '100%', width: '0%', background: 'var(--bf-leaf)', borderRadius: 999 }} />
+							</div>
+							<div style={{ fontSize: 10, color: 'var(--bf-mute)', marginTop: 3 }}>{form.maxOrders} orders max</div>
+						</div>
+					)}
+
 					{/* Price */}
 					<div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
 						<div>
@@ -285,6 +507,13 @@ function DealPreview({ form, items }: { form: DealFormState; items: SelectedItem
 							</span>
 						)}
 					</div>
+
+					{/* Terms preview */}
+					{form.termsText && (
+						<div style={{ marginTop: 8, fontSize: 10, color: 'var(--bf-mute)', borderTop: '1px solid var(--bf-line)', paddingTop: 8, fontStyle: 'italic' }}>
+							{form.termsText}
+						</div>
+					)}
 				</div>
 			</div>
 
@@ -293,7 +522,7 @@ function DealPreview({ form, items }: { form: DealFormState; items: SelectedItem
 				<div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: '#DCFCE7', border: '1px solid #86efac' }}>
 					<div style={{ font: '700 12px var(--bf-font)', color: '#15803d', marginBottom: 3 }}>🎉 Great savings!</div>
 					<div style={{ fontSize: 11, color: '#166534' }}>
-						Customers save <strong>Rs.{sav.amount.toLocaleString('en-PK')}</strong> — that&apos;s <strong>{sav.pct}% off</strong>
+						Customers save <strong>Rs.{sav.amount.toLocaleString('en-PK')}</strong> — <strong>{sav.pct}% off</strong>
 					</div>
 				</div>
 			)}
@@ -305,6 +534,7 @@ function DealPreview({ form, items }: { form: DealFormState; items: SelectedItem
 					{ ok: items.length > 0, label: 'Items added' },
 					{ ok: !!form.discountPrice && form.discountPrice > 0, label: 'Deal price set' },
 					{ ok: !form.originalPrice || !form.discountPrice || form.discountPrice <= form.originalPrice, label: 'Price is valid' },
+					{ ok: !form.startsAt || !form.expiresAt || new Date(form.expiresAt) > new Date(form.startsAt), label: 'Schedule is valid' },
 				].map(({ ok, label }) => (
 					<div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
 						<div style={{
@@ -328,12 +558,37 @@ interface DealFormState {
 	title: string; tag: string; badge: string; description: string
 	originalPrice: number | null; discountPrice: number | null
 	isFeatured: boolean; isActive: boolean
+	imageUrl: string; termsText: string
+	maxOrders: number | null; displayOrder: number | null
+	startsAt: string; expiresAt: string
 }
 
 const EMPTY_FORM: DealFormState = {
 	title: '', tag: '', badge: '', description: '',
 	originalPrice: null, discountPrice: null,
 	isFeatured: false, isActive: true,
+	imageUrl: '', termsText: '',
+	maxOrders: null, displayOrder: null,
+	startsAt: '', expiresAt: '',
+}
+
+function dealToForm(deal: Deal): DealFormState {
+	return {
+		title: deal.title,
+		tag: deal.tag ?? '',
+		badge: deal.badge ?? '',
+		description: deal.description ?? '',
+		originalPrice: deal.originalPrice ?? null,
+		discountPrice: deal.discountPrice ?? null,
+		isFeatured: deal.isFeatured ?? false,
+		isActive: deal.isActive,
+		imageUrl: deal.imageUrl ?? '',
+		termsText: deal.termsText ?? '',
+		maxOrders: deal.maxOrders ?? null,
+		displayOrder: deal.displayOrder ?? null,
+		startsAt: deal.startsAt ? deal.startsAt.substring(0, 16) : '',
+		expiresAt: deal.expiresAt ? deal.expiresAt.substring(0, 16) : '',
+	}
 }
 
 function SectionHeader({ label, color = 'var(--bf-ember)' }: { label: string; color?: string }) {
@@ -351,11 +606,9 @@ function DealModal({ deal, products, onClose, onSaved }: {
 	onClose: () => void
 	onSaved: () => void
 }) {
-	const isNew = deal === null
+	const isNew = deal === null || deal.id === 0
 	const [form, setForm] = useState<DealFormState>(() =>
-		deal
-			? { title: deal.title, tag: deal.tag ?? '', badge: deal.badge ?? '', description: deal.description ?? '', originalPrice: deal.originalPrice ?? null, discountPrice: deal.discountPrice ?? null, isFeatured: deal.isFeatured ?? false, isActive: deal.isActive }
-			: { ...EMPTY_FORM }
+		deal ? dealToForm(deal) : { ...EMPTY_FORM }
 	)
 	const [selectedItems, setSelectedItems] = useState<SelectedItem[]>(() =>
 		parseToSelected(deal?.items, products)
@@ -374,14 +627,26 @@ function DealModal({ deal, products, onClose, onSaved }: {
 		form.originalPrice != null && form.discountPrice != null && form.discountPrice > form.originalPrice
 			? `Deal price (Rs.${form.discountPrice.toLocaleString('en-PK')}) cannot exceed original price (Rs.${form.originalPrice.toLocaleString('en-PK')})`
 			: null
-	const canSave = form.title.trim().length > 0 && !priceError
+	const scheduleError =
+		form.startsAt && form.expiresAt && new Date(form.expiresAt) <= new Date(form.startsAt)
+			? 'Expiry date must be after start date'
+			: null
+	const canSave = form.title.trim().length > 0 && !priceError && !scheduleError
 
 	async function handleSubmit() {
 		if (!form.title.trim()) { setError('Deal title is required'); return }
 		if (priceError) { setError(priceError); return }
+		if (scheduleError) { setError(scheduleError); return }
 		setSaving(true); setError(null)
 		try {
-			await saveDeal(isNew ? null : deal!.id, { ...form, items: serializeItems(selectedItems) } as Omit<Deal, 'id'>)
+			await saveDeal(isNew ? null : deal!.id, {
+				...form,
+				items: serializeItems(selectedItems),
+				startsAt: toIso(form.startsAt),
+				expiresAt: toIso(form.expiresAt),
+				imageUrl: form.imageUrl || null,
+				termsText: form.termsText || null,
+			} as Omit<Deal, 'id'>)
 			onSaved()
 		} catch (e: unknown) {
 			const axiosErr = e as { response?: { data?: { message?: string } } }
@@ -393,14 +658,12 @@ function DealModal({ deal, products, onClose, onSaved }: {
 
 	return (
 		<div className='bf-admin-modal-wrap' onClick={onClose}>
-			<div
-				className='bf-admin-modal-inner'
-				onClick={e => e.stopPropagation()}
-			>
+			<div className='bf-admin-modal-inner' onClick={e => e.stopPropagation()}>
+
 				{/* Header */}
 				<div className='bf-admin-modal-header'>
 					<div>
-						<div className='bf-eyebrow' style={{ marginBottom: 3 }}>{isNew ? 'CREATE DEAL' : 'EDIT DEAL'}</div>
+						<div className='bf-eyebrow' style={{ marginBottom: 3 }}>{isNew ? (deal?.id === 0 ? 'CLONE DEAL' : 'CREATE DEAL') : 'EDIT DEAL'}</div>
 						<h2 style={{ fontWeight: 800, fontSize: 22, margin: 0, letterSpacing: '-0.025em' }}>
 							{form.title.trim() || (isNew ? 'New deal' : 'Edit deal')}
 						</h2>
@@ -414,7 +677,7 @@ function DealModal({ deal, products, onClose, onSaved }: {
 					{/* Left: form */}
 					<div className='bf-admin-modal-form-col bf-scroll'>
 
-						{/* Identity */}
+						{/* ── IDENTITY ── */}
 						<div>
 							<SectionHeader label='DEAL IDENTITY' color='var(--bf-amber)' />
 							<div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -466,7 +729,29 @@ function DealModal({ deal, products, onClose, onSaved }: {
 
 						<hr className='bf-rule' />
 
-						{/* Items */}
+						{/* ── DEAL IMAGE ── */}
+						<div>
+							<SectionHeader label='DEAL IMAGE' color='var(--bf-amber)' />
+							<div>
+								<label className='bf-label'>Image URL <span className='bf-opt'>(optional)</span></label>
+								<input
+									className='bf-input'
+									value={form.imageUrl}
+									onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))}
+									placeholder='https://your-cdn.com/deal-image.jpg'
+								/>
+								<div style={{ fontSize: 10.5, color: 'var(--bf-mute)', marginTop: 4 }}>Paste a direct image link — shown on the deal card</div>
+							</div>
+							{form.imageUrl && (
+								<div style={{ marginTop: 10, borderRadius: 12, overflow: 'hidden', height: 100, background: 'var(--bf-cream-2)' }}>
+									<img src={form.imageUrl} alt='Deal preview' style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }} />
+								</div>
+							)}
+						</div>
+
+						<hr className='bf-rule' />
+
+						{/* ── WHAT'S INCLUDED ── */}
 						<div>
 							<SectionHeader label="WHAT'S INCLUDED" color='var(--bf-ink)' />
 							<ProductPicker
@@ -480,14 +765,14 @@ function DealModal({ deal, products, onClose, onSaved }: {
 							<SelectedItemsList items={selectedItems} onChange={setSelectedItems} />
 							{selectedItems.length === 0 && (
 								<p style={{ fontSize: 12, color: 'var(--bf-mute)', marginTop: 10, fontStyle: 'italic' }}>
-									Add products to auto-calculate the original price
+									Add products — then click the pencil icon to set size and available flavors
 								</p>
 							)}
 						</div>
 
 						<hr className='bf-rule' />
 
-						{/* Pricing */}
+						{/* ── PRICING ── */}
 						<div>
 							<SectionHeader label='PRICING' color='var(--bf-ember)' />
 							<div style={{ background: 'var(--bf-cream-2)', borderRadius: 16, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -549,7 +834,50 @@ function DealModal({ deal, products, onClose, onSaved }: {
 
 						<hr className='bf-rule' />
 
-						{/* Options */}
+						{/* ── AVAILABILITY ── */}
+						<div>
+							<SectionHeader label='AVAILABILITY' color='#6366f1' />
+							<div style={{ background: 'var(--bf-cream-2)', borderRadius: 16, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+								<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+									<div>
+										<label className='bf-label'>Start date & time <span className='bf-opt'>(optional)</span></label>
+										<input
+											className='bf-input'
+											type='datetime-local'
+											value={form.startsAt}
+											onChange={e => setForm(f => ({ ...f, startsAt: e.target.value }))}
+										/>
+										<div style={{ fontSize: 10.5, color: 'var(--bf-mute)', marginTop: 4 }}>Blank = visible immediately</div>
+									</div>
+									<div>
+										<label className='bf-label'>Expiry date & time <span className='bf-opt'>(optional)</span></label>
+										<input
+											className='bf-input'
+											type='datetime-local'
+											value={form.expiresAt}
+											onChange={e => setForm(f => ({ ...f, expiresAt: e.target.value }))}
+										/>
+										<div style={{ fontSize: 10.5, color: 'var(--bf-mute)', marginTop: 4 }}>Blank = no expiry</div>
+									</div>
+								</div>
+								{scheduleError && (
+									<div style={{ padding: '10px 13px', borderRadius: 10, background: 'rgba(232,67,31,.1)', color: 'var(--bf-ember)', fontSize: 12.5, fontWeight: 600 }}>
+										⚠ {scheduleError}
+									</div>
+								)}
+								{(form.startsAt || form.expiresAt) && !scheduleError && (
+									<div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(99,102,241,.08)', border: '1px solid rgba(99,102,241,.2)', fontSize: 12, color: '#4338ca', fontWeight: 600 }}>
+										{form.startsAt && !form.expiresAt && `Starts ${new Date(form.startsAt).toLocaleString('en-PK', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
+										{!form.startsAt && form.expiresAt && `Expires ${new Date(form.expiresAt).toLocaleString('en-PK', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
+										{form.startsAt && form.expiresAt && `Active ${new Date(form.startsAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })} → ${new Date(form.expiresAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}`}
+									</div>
+								)}
+							</div>
+						</div>
+
+						<hr className='bf-rule' />
+
+						{/* ── OPTIONS ── */}
 						<div>
 							<SectionHeader label='OPTIONS' color='var(--bf-leaf)' />
 							<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -570,6 +898,50 @@ function DealModal({ deal, products, onClose, onSaved }: {
 							</div>
 						</div>
 
+						<hr className='bf-rule' />
+
+						{/* ── LIMITS & TERMS ── */}
+						<div>
+							<SectionHeader label='LIMITS & TERMS' color='var(--bf-leaf)' />
+							<div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+								<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+									<div>
+										<label className='bf-label'>Max orders <span className='bf-opt'>(quota)</span></label>
+										<input
+											className='bf-input bf-mono'
+											type='number' min={1}
+											value={form.maxOrders ?? ''}
+											onChange={e => setForm(f => ({ ...f, maxOrders: e.target.value ? parseInt(e.target.value) : null }))}
+											placeholder='Unlimited'
+										/>
+										<div style={{ fontSize: 10.5, color: 'var(--bf-mute)', marginTop: 4 }}>Creates urgency bar for customers</div>
+									</div>
+									<div>
+										<label className='bf-label'>Display order <span className='bf-opt'>(priority)</span></label>
+										<input
+											className='bf-input bf-mono'
+											type='number' min={0}
+											value={form.displayOrder ?? ''}
+											onChange={e => setForm(f => ({ ...f, displayOrder: e.target.value ? parseInt(e.target.value) : null }))}
+											placeholder='0 = default'
+										/>
+										<div style={{ fontSize: 10.5, color: 'var(--bf-mute)', marginTop: 4 }}>Lower number = appears first</div>
+									</div>
+								</div>
+								<div>
+									<label className='bf-label'>Terms & conditions <span className='bf-opt'>(optional)</span></label>
+									<textarea
+										className='bf-input'
+										rows={2}
+										value={form.termsText}
+										onChange={e => setForm(f => ({ ...f, termsText: e.target.value }))}
+										placeholder='e.g. Dine-in only · Not combinable with other offers · Delivery minimum Rs.500'
+										style={{ resize: 'vertical', lineHeight: 1.5, fontSize: 12 }}
+									/>
+								</div>
+							</div>
+						</div>
+
 						{error && (
 							<div style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(232,67,31,.1)', color: 'var(--bf-ember)', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 7 }}>
 								<span>⚠</span> {error}
@@ -577,7 +949,7 @@ function DealModal({ deal, products, onClose, onSaved }: {
 						)}
 					</div>
 
-					{/* Right: live preview (hidden on mobile) */}
+					{/* Right: live preview */}
 					<div className='bf-admin-modal-preview-col bf-scroll'>
 						<DealPreview form={form} items={selectedItems} />
 					</div>
@@ -601,20 +973,47 @@ function DealModal({ deal, products, onClose, onSaved }: {
 }
 
 // ─── Deal Card (grid) ─────────────────────────────────────────────────────────
-function DealCard({ deal, onEdit, onToggle, onDelete, toggling }: {
-	deal: Deal; onEdit: () => void; onToggle: () => void; onDelete: () => void; toggling?: boolean
+function DealCard({ deal, onEdit, onToggle, onDelete, onClone, toggling }: {
+	deal: Deal; onEdit: () => void; onToggle: () => void; onDelete: () => void; onClone: () => void; toggling?: boolean
 }) {
-	const itemLines = deal.items?.split('\n').filter(Boolean) ?? []
+	// Parse structured items (JSON or legacy)
+	const itemLines = (() => {
+		const raw = deal.items
+		if (!raw?.trim()) return []
+		if (raw.trim().startsWith('[')) {
+			try {
+				const parsed = JSON.parse(raw) as Array<{ name: string; qty: number; size?: string | null; availableFlavors?: string[] }>
+				return parsed.map(i => {
+					const parts = [`${i.qty}× ${i.name}`]
+					if (i.size) parts.push(i.size)
+					if (i.availableFlavors?.length) parts.push(i.availableFlavors.join(', '))
+					return parts.join(' · ')
+				})
+			} catch { /* fall through */ }
+		}
+		return raw.split('\n').filter(Boolean)
+	})()
+
 	const sav = getSavings(deal.originalPrice ?? 0, deal.discountPrice ?? null)
+	const expiryInfo = getExpiryInfo(deal.expiresAt)
+	const startInfo = getStartInfo(deal.startsAt)
+	const quotaPct = deal.maxOrders ? Math.min(100, Math.round(((deal.ordersCount ?? 0) / deal.maxOrders) * 100)) : null
 
 	return (
 		<div className='bf-card bf-lift' style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 			{/* Status bar */}
 			<div style={{ height: 4, background: deal.isActive ? (deal.isFeatured ? 'var(--bf-amber)' : 'var(--bf-ember)') : 'var(--bf-line)', flexShrink: 0, transition: 'background .2s' }} />
 
+			{/* Deal image */}
+			{deal.imageUrl && (
+				<div style={{ height: 110, overflow: 'hidden', flexShrink: 0 }}>
+					<img src={deal.imageUrl} alt={deal.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+				</div>
+			)}
+
 			<div style={{ padding: '14px 16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-				{/* Top row */}
-				<div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
+				{/* Top row: badges + status toggle */}
+				<div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10, flexWrap: 'wrap' }}>
 					{deal.isFeatured && <span className='bf-pill' style={{ background: '#FEF9C3', color: '#713f12', boxShadow: 'none', fontSize: 10 }}>⭐ Featured</span>}
 					{deal.tag && <span className='bf-pill bf-pill-ink' style={{ fontSize: 10 }}>{deal.tag}</span>}
 					{deal.badge && <span className='bf-pill bf-pill-ember' style={{ fontSize: 10 }}>{deal.badge}</span>}
@@ -638,6 +1037,22 @@ function DealCard({ deal, onEdit, onToggle, onDelete, toggling }: {
 					</div>
 				</div>
 
+				{/* Expiry / schedule badges */}
+				{(expiryInfo || startInfo) && (
+					<div style={{ marginBottom: 8 }}>
+						{expiryInfo && (
+							<span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, background: expiryInfo.bg, color: expiryInfo.color, fontSize: 10.5, fontWeight: 600 }}>
+								⏱ {expiryInfo.text}
+							</span>
+						)}
+						{startInfo && !expiryInfo && (
+							<span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, background: 'rgba(99,102,241,.1)', color: '#4338ca', fontSize: 10.5, fontWeight: 600 }}>
+								📅 {startInfo}
+							</span>
+						)}
+					</div>
+				)}
+
 				<h3 style={{ fontWeight: 800, fontSize: 16, margin: '0 0 5px', letterSpacing: '-0.01em', lineHeight: 1.25 }}>{deal.title}</h3>
 				{deal.description && <p style={{ fontSize: 12, color: 'var(--bf-ink-2)', margin: '0 0 8px', lineHeight: 1.4 }}>{deal.description}</p>}
 
@@ -651,6 +1066,19 @@ function DealCard({ deal, onEdit, onToggle, onDelete, toggling }: {
 						))}
 						{itemLines.length > 4 && <li style={{ fontSize: 11, color: 'var(--bf-mute)', paddingLeft: 10 }}>+{itemLines.length - 4} more</li>}
 					</ul>
+				)}
+
+				{/* Quota bar */}
+				{deal.maxOrders && quotaPct !== null && (
+					<div style={{ marginTop: 10 }}>
+						<div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+							<span style={{ fontSize: 10, fontWeight: 600, color: 'var(--bf-mute)' }}>Quota</span>
+							<span className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)' }}>{deal.ordersCount ?? 0}/{deal.maxOrders}</span>
+						</div>
+						<div style={{ height: 4, background: 'var(--bf-line)', borderRadius: 999, overflow: 'hidden' }}>
+							<div style={{ height: '100%', width: `${quotaPct}%`, background: quotaPct > 80 ? 'var(--bf-ember)' : 'var(--bf-leaf)', transition: 'width .3s' }} />
+						</div>
+					</div>
 				)}
 
 				{/* Price */}
@@ -674,9 +1102,19 @@ function DealCard({ deal, onEdit, onToggle, onDelete, toggling }: {
 			</div>
 
 			{/* Actions */}
-			<div style={{ padding: '10px 16px 12px', display: 'flex', gap: 7, borderTop: '1px solid var(--bf-line)', flexShrink: 0, background: 'var(--bf-cream-2)' }}>
+			<div style={{ padding: '10px 16px 12px', display: 'flex', gap: 7, borderTop: '1px solid var(--bf-line)', flexShrink: 0, background: 'var(--bf-cream-2)', alignItems: 'center' }}>
 				<button className='bf-btn bf-btn-outline bf-btn-sm' style={{ flex: 1, fontWeight: 700 }} onClick={onEdit}>
 					{Icons.edit} Edit
+				</button>
+				<button
+					className='bf-btn bf-btn-ghost bf-btn-icon'
+					style={{ width: 34, height: 34 }}
+					onClick={onClone}
+					title='Clone deal'
+				>
+					<svg width={14} height={14} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
+						<rect x='9' y='9' width='13' height='13' rx='2' ry='2'/><path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/>
+					</svg>
 				</button>
 				<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ color: 'var(--bf-ember)', width: 34, height: 34 }} onClick={onDelete}>
 					{Icons.trash}
@@ -718,6 +1156,10 @@ export function AdminDeals() {
 		} finally {
 			setDeleting(false)
 		}
+	}
+
+	function handleClone(deal: Deal) {
+		setModal({ ...deal, id: 0, title: `Copy of ${deal.title}`, isActive: false, ordersCount: 0 } as Deal)
 	}
 
 	return (
@@ -780,6 +1222,7 @@ export function AdminDeals() {
 								onEdit={() => setModal(deal)}
 								onToggle={() => !toggling && handleToggle(deal)}
 								onDelete={() => setDeleteId(deal.id)}
+								onClone={() => handleClone(deal)}
 								toggling={toggling === deal.id}
 							/>
 						))}

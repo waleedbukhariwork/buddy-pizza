@@ -81,4 +81,11 @@ export interface Deal {
 	items?: string | null
 	isActive: boolean
 	isFeatured?: boolean | null
+	imageUrl?: string | null
+	termsText?: string | null
+	startsAt?: string | null
+	expiresAt?: string | null
+	maxOrders?: number | null
+	ordersCount?: number | null
+	displayOrder?: number | null
 }

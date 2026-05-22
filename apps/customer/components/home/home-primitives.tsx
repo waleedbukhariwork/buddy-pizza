@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FoodImg, type Tone } from '../ui/food-img'
 import { Icons } from '../ui/icon'
-import { rs, type Deal } from '../../lib/hooks'
+import { rs, parseDealItems, getDealExpiryBadge, type Deal } from '../../lib/hooks'
 import { useCartStore } from '../../lib/cart-store'
 import { useAuthStore } from '../../lib/auth-store'
 
@@ -23,12 +23,19 @@ function DealCard({ d, tone = 'ember' }: { d: Deal; tone?: Tone }) {
 	const inCart = useCartStore((s) => s.items.some((i) => i.dealId === d.id))
 	const token = useAuthStore((s) => s.token)
 
-	const itemLines = d.items?.split('\n').filter(Boolean) ?? []
+	const parsedItems = parseDealItems(d.items)
+	const hasFlavorItems = parsedItems.some(i => (i.availableFlavors?.length ?? 0) > 0)
+	const expiryBadge = getDealExpiryBadge(d.expiresAt)
 
 	function handleAdd(e: React.MouseEvent) {
 		e.stopPropagation()
 		if (!token) {
 			router.push(`/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`)
+			return
+		}
+		// Navigate to detail page if flavor selection is needed
+		if (hasFlavorItems) {
+			router.push(`/deals/${d.id}`)
 			return
 		}
 		addItem({
@@ -37,7 +44,7 @@ function DealCard({ d, tone = 'ember' }: { d: Deal; tone?: Tone }) {
 			productName: d.title,
 			price: d.discountPrice ?? 0,
 			quantity: 1,
-			customizations: d.items ?? '',
+			customizations: parsedItems.map(i => `${i.qty}× ${i.name}${i.size ? ' (' + i.size + ')' : ''}`).join(', '),
 		})
 	}
 
@@ -47,22 +54,39 @@ function DealCard({ d, tone = 'ember' }: { d: Deal; tone?: Tone }) {
 			style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
 			onClick={() => router.push(`/deals/${d.id}`)}
 		>
-			{/* Image — fixed height, edge-to-edge */}
-			<FoodImg
-				tone={tone}
-				caption={'deal · ' + d.title.toLowerCase()}
-				style={{ height: 130, borderRadius: 0, flexShrink: 0 }}
-			/>
+			{/* Image */}
+			{d.imageUrl ? (
+				<img
+					src={d.imageUrl}
+					alt={d.title}
+					style={{ height: 130, width: '100%', objectFit: 'cover', flexShrink: 0 }}
+				/>
+			) : (
+				<FoodImg
+					tone={tone}
+					caption={'deal · ' + d.title.toLowerCase()}
+					style={{ height: 130, borderRadius: 0, flexShrink: 0 }}
+				/>
+			)}
 
-			{/* Body — grows to fill card height so button always sticks to bottom */}
+			{/* Body */}
 			<div style={{ flex: 1, padding: '14px 16px 16px', display: 'flex', flexDirection: 'column' }}>
 				{/* Badges row */}
-				<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-					<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+				<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6, flexWrap: 'wrap' }}>
+					<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
 						{d.tag && <span className='bf-pill bf-pill-ink'>{d.tag}</span>}
 						{d.originalPrice && d.discountPrice && d.originalPrice > d.discountPrice && (
 							<span className='bf-pill bf-pill-leaf' style={{ fontSize: 10 }}>
 								Save {rs(d.originalPrice - d.discountPrice)}
+							</span>
+						)}
+						{expiryBadge && (
+							<span style={{
+								fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999,
+								color: expiryBadge.urgent ? '#dc2626' : '#92400e',
+								background: expiryBadge.urgent ? '#fee2e2' : '#fef3c7',
+							}}>
+								⏱ {expiryBadge.text}
 							</span>
 						)}
 					</div>
@@ -72,28 +96,55 @@ function DealCard({ d, tone = 'ember' }: { d: Deal; tone?: Tone }) {
 				{/* Title + description */}
 				<div style={{ fontWeight: 800, fontSize: 16, letterSpacing: '-0.01em', lineHeight: 1.2 }}>{d.title}</div>
 				{d.description && (
-					<div style={{ color: 'var(--bf-ink-2)', fontSize: 12, marginTop: 4, lineHeight: 1.35,
-						display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+					<div style={{
+						color: 'var(--bf-ink-2)', fontSize: 12, marginTop: 4, lineHeight: 1.35,
+						display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+					}}>
 						{d.description}
 					</div>
 				)}
 
 				{/* Included items */}
-				{itemLines.length > 0 && (
+				{parsedItems.length > 0 && (
 					<ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 3 }}>
-						{itemLines.map((line, i) => (
-							<li key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12 }}>
-								<span style={{ width: 15, height: 15, borderRadius: '50%', background: 'var(--bf-ember)', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 8, fontWeight: 800 }}>✓</span>
-								<span style={{ color: 'var(--bf-ink)' }}>{line}</span>
-							</li>
-						))}
+						{parsedItems.slice(0, 3).map((item, i) => {
+							const label = [
+								`${item.qty}× ${item.name}`,
+								item.size,
+							].filter(Boolean).join(' · ')
+							return (
+								<li key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12 }}>
+									<span style={{ width: 15, height: 15, borderRadius: '50%', background: 'var(--bf-ember)', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 8, fontWeight: 800 }}>✓</span>
+									<span style={{ color: 'var(--bf-ink)' }}>{label}</span>
+								</li>
+							)
+						})}
+						{parsedItems.length > 3 && (
+							<li style={{ fontSize: 11, color: 'var(--bf-mute)', paddingLeft: 22 }}>+{parsedItems.length - 3} more</li>
+						)}
 					</ul>
 				)}
 
-				{/* Spacer — pushes price+CTA to bottom */}
+				{/* Quota bar */}
+				{d.maxOrders && d.ordersCount !== undefined && d.ordersCount !== null && (
+					<div style={{ marginTop: 8 }}>
+						<div style={{ height: 3, background: 'var(--bf-line)', borderRadius: 999, overflow: 'hidden' }}>
+							<div style={{
+								height: '100%',
+								width: `${Math.min(100, Math.round((d.ordersCount / d.maxOrders) * 100))}%`,
+								background: (d.ordersCount / d.maxOrders) > 0.8 ? 'var(--bf-ember)' : 'var(--bf-leaf)',
+							}} />
+						</div>
+						<div style={{ fontSize: 10, color: 'var(--bf-mute)', marginTop: 2 }}>
+							{d.maxOrders - d.ordersCount} of {d.maxOrders} remaining
+						</div>
+					</div>
+				)}
+
+				{/* Spacer */}
 				<div style={{ flex: 1 }} />
 
-				{/* Price + CTA — always at bottom */}
+				{/* Price + CTA */}
 				<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
 					<div>
 						{d.originalPrice && (
@@ -120,7 +171,7 @@ function DealCard({ d, tone = 'ember' }: { d: Deal; tone?: Tone }) {
 							onClick={handleAdd}
 							style={{ width: 32, height: 32, padding: 0, borderRadius: 999 }}
 						>
-							{Icons.plus}
+							{hasFlavorItems ? Icons.arrow : Icons.plus}
 						</button>
 					)}
 				</div>

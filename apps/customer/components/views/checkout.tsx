@@ -194,16 +194,16 @@ function CheckoutExperience() {
 			return
 		}
 
-		const orderItems = items
-			.filter((it) => it.productId > 0)
-			.map((it) => ({
-				productId: it.productId,
-				quantity: it.quantity,
-				customizations: [it.size, it.customizations].filter(Boolean).join(', ') || undefined,
-			}))
+		const orderItems = items.map((it) => {
+			const customizations = [it.size, it.customizations].filter(Boolean).join(', ') || undefined
+			if (it.dealId != null) {
+				return { dealId: it.dealId, itemName: it.productName, price: it.price, quantity: it.quantity, customizations }
+			}
+			return { productId: it.productId, quantity: it.quantity, customizations }
+		})
 
 		if (orderItems.length === 0) {
-			setSubmitError('We need at least one menu item in your cart before checkout.')
+			setSubmitError('Your cart is empty. Add an item before placing an order.')
 			return
 		}
 

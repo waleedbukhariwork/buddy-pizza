@@ -5,7 +5,10 @@ import com.buddyfeast.dto.OrderDTO;
 import com.buddyfeast.entity.*;
 import com.buddyfeast.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -23,12 +26,15 @@ public class OrderService {
     private ProductRepository productRepository;
 
     @Autowired
+    private DealRepository dealRepository;
+
+    @Autowired
     private RiderRepository riderRepository;
-    
+
     public OrderDTO createOrder(CreateOrderRequest request, Long userId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
-        
+
         Order order = Order.builder()
             .orderNumber("#BF-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase())
             .user(user)
@@ -37,33 +43,56 @@ public class OrderService {
             .specialNotes(request.getSpecialNotes())
             .status(Order.OrderStatus.NEW)
             .build();
-        
-        Double total = 0.0;
+
+        LocalDateTime now = LocalDateTime.now();
         List<OrderItem> items = request.getItems().stream().map(itemReq -> {
-            Product product = productRepository.findById(itemReq.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found"));
-            
-            OrderItem item = OrderItem.builder()
-                .order(order)
-                .product(product)
-                .quantity(itemReq.getQuantity())
-                .price(product.getPrice())
-                .customizations(itemReq.getCustomizations())
-                .build();
-            
-            return item;
+            if (itemReq.getDealId() != null) {
+                Deal deal = dealRepository.findById(itemReq.getDealId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Deal not found"));
+
+                if (Boolean.FALSE.equals(deal.getIsActive()))
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Deal '" + deal.getTitle() + "' is no longer active");
+                if (deal.getExpiresAt() != null && !now.isBefore(deal.getExpiresAt()))
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Deal '" + deal.getTitle() + "' has expired");
+                if (deal.getMaxOrders() != null && deal.getOrdersCount() != null && deal.getOrdersCount() >= deal.getMaxOrders())
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Deal '" + deal.getTitle() + "' is sold out");
+
+                deal.setOrdersCount(deal.getOrdersCount() + itemReq.getQuantity());
+                dealRepository.save(deal);
+
+                double price = itemReq.getPrice() != null ? itemReq.getPrice() : (deal.getDiscountPrice() != null ? deal.getDiscountPrice() : 0.0);
+                return OrderItem.builder()
+                    .order(order)
+                    .dealId(deal.getId())
+                    .itemName(deal.getTitle())
+                    .quantity(itemReq.getQuantity())
+                    .price(price)
+                    .customizations(itemReq.getCustomizations())
+                    .build();
+            } else {
+                Product product = productRepository.findById(itemReq.getProductId())
+                    .orElseThrow(() -> new RuntimeException("Product not found"));
+                return OrderItem.builder()
+                    .order(order)
+                    .product(product)
+                    .itemName(product.getName())
+                    .quantity(itemReq.getQuantity())
+                    .price(product.getPrice())
+                    .customizations(itemReq.getCustomizations())
+                    .build();
+            }
         }).collect(Collectors.toList());
-        
-        total = items.stream()
+
+        double total = items.stream()
             .mapToDouble(item -> item.getPrice() * item.getQuantity())
             .sum();
-        
+
         order.setItems(items);
         order.setSubtotal(total);
         order.setTotal(total);
-        
+
         orderRepository.save(order);
-        
+
         return convertToDTO(order);
     }
     
@@ -105,11 +134,15 @@ public class OrderService {
     
     private OrderDTO convertToDTO(Order order) {
         List<OrderDTO.OrderItemDTO> itemDTOs = order.getItems().stream()
-            .map(item -> OrderDTO.OrderItemDTO.builder()
-                .productName(item.getProduct().getName())
-                .quantity(item.getQuantity())
-                .price(item.getPrice())
-                .build())
+            .map(item -> {
+                String name = item.getItemName() != null ? item.getItemName()
+                    : (item.getProduct() != null ? item.getProduct().getName() : "Item");
+                return OrderDTO.OrderItemDTO.builder()
+                    .productName(name)
+                    .quantity(item.getQuantity())
+                    .price(item.getPrice())
+                    .build();
+            })
             .collect(Collectors.toList());
         
         return OrderDTO.builder()

@@ -27,6 +27,15 @@ export interface Category {
 	isActive: boolean
 }
 
+export interface DealItem {
+	productId?: number | null
+	name: string
+	qty: number
+	size?: string | null
+	availableFlavors?: string[]
+	unitPrice: number
+}
+
 export interface Deal {
 	id: number
 	title: string
@@ -37,6 +46,40 @@ export interface Deal {
 	badge?: string | null
 	items?: string | null
 	isActive: boolean
+	imageUrl?: string | null
+	termsText?: string | null
+	startsAt?: string | null
+	expiresAt?: string | null
+	maxOrders?: number | null
+	ordersCount?: number | null
+	displayOrder?: number | null
+}
+
+export function parseDealItems(raw: string | null | undefined): DealItem[] {
+	if (!raw?.trim()) return []
+	if (raw.trim().startsWith('[')) {
+		try {
+			return JSON.parse(raw) as DealItem[]
+		} catch {
+			// fall through to legacy format
+		}
+	}
+	return raw.split('\n').filter(Boolean).map(line => {
+		const m = line.match(/^(\d+)×\s*(.+)$/)
+		return { name: m ? m[2] : line, qty: m ? parseInt(m[1]) : 1, unitPrice: 0, availableFlavors: [] }
+	})
+}
+
+export function getDealExpiryBadge(expiresAt: string | null | undefined): { text: string; urgent: boolean } | null {
+	if (!expiresAt) return null
+	const diff = new Date(expiresAt).getTime() - Date.now()
+	if (diff < 0) return null
+	const hours = Math.floor(diff / 3_600_000)
+	if (hours < 2) return { text: 'Ending soon!', urgent: true }
+	if (hours < 24) return { text: `Ends in ${hours}h`, urgent: true }
+	const days = Math.floor(hours / 24)
+	if (days <= 7) return { text: `Ends in ${days} day${days > 1 ? 's' : ''}`, urgent: false }
+	return null
 }
 
 export interface OrderItem {
@@ -122,7 +165,7 @@ export interface PlacedOrder {
 }
 
 export async function placeOrder(payload: {
-	items: Array<{ productId: number; quantity: number; customizations?: string }>
+	items: Array<{ productId?: number; dealId?: number; itemName?: string; price?: number; quantity: number; customizations?: string }>
 	deliveryAddress: string
 	customerPhone: string
 	specialNotes?: string

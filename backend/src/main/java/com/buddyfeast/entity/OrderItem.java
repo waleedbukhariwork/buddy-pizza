@@ -20,9 +20,12 @@ public class OrderItem {
     private Order order;
     
     @ManyToOne
-    @JoinColumn(name = "product_id")
+    @JoinColumn(name = "product_id", nullable = true)
     private Product product;
-    
+
+    private Long dealId;
+    private String itemName;
+
     private Integer quantity;
     private Double price;
     private String customizations;

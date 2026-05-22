@@ -15,7 +15,7 @@ public class Deal {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     private String title;
     private String description;
     private String tag;
@@ -28,20 +28,37 @@ public class Deal {
 
     private Boolean isActive = true;
     private Boolean isFeatured = false;
-    
+
+    // Image & content
+    private String imageUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String termsText;
+
+    // Scheduling
+    private LocalDateTime startsAt;
+    private LocalDateTime expiresAt;
+
+    // Quota / ordering
+    private Integer maxOrders;
+    private Integer ordersCount = 0;
+    private Integer displayOrder = 0;
+
     @ManyToOne
     @JoinColumn(name = "restaurant_id")
     private Restaurant restaurant;
-    
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (ordersCount == null) ordersCount = 0;
+        if (displayOrder == null) displayOrder = 0;
     }
-    
+
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
