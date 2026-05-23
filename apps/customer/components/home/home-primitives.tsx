@@ -94,7 +94,10 @@ function DealCard({ d, tone = 'ember', featured = false }: { d: Deal; tone?: Ton
 				</div>
 
 				{/* Title + description */}
-				<div style={{ fontWeight: 800, fontSize: 16, letterSpacing: '-0.01em', lineHeight: 1.2 }}>{d.title}</div>
+				<div style={{
+					fontWeight: 800, fontSize: 16, letterSpacing: '-0.01em', lineHeight: 1.2,
+					display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+				}}>{d.title}</div>
 				{d.description && (
 					<div style={{
 						color: 'var(--bf-ink-2)', fontSize: 12, marginTop: 4, lineHeight: 1.35,

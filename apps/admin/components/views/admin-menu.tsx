@@ -783,11 +783,18 @@ function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryC
 							<textarea
 								className='bf-input'
 								rows={3}
+								maxLength={255}
 								value={form.description}
 								onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
 								placeholder='Short, appetizing description shown on the menu…'
 								style={{ resize: 'vertical', lineHeight: 1.5 }}
 							/>
+							<div style={{
+								textAlign: 'right', fontSize: 11, marginTop: 4, fontFamily: 'var(--bf-mono)',
+								color: form.description.length > 210 ? (form.description.length >= 255 ? 'var(--bf-ember)' : '#B45309') : 'var(--bf-mute)',
+							}}>
+								{form.description.length} / 255
+							</div>
 						</div>
 
 						{saveError && (

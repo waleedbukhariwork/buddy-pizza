@@ -797,11 +797,18 @@ function DealModal({ deal, products, onClose, onSaved }: {
 									<textarea
 										className='bf-input'
 										rows={2}
+										maxLength={255}
 										value={form.description}
 										onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
 										placeholder='Short tagline shown on the deal card…'
 										style={{ resize: 'vertical', lineHeight: 1.5 }}
 									/>
+									<div style={{
+										textAlign: 'right', fontSize: 11, marginTop: 4, fontFamily: 'var(--bf-mono)',
+										color: form.description.length > 210 ? (form.description.length >= 255 ? 'var(--bf-ember)' : '#B45309') : 'var(--bf-mute)',
+									}}>
+										{form.description.length} / 255
+									</div>
 								</div>
 							</div>
 						</div>

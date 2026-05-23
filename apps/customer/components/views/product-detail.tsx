@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { CustomerShell } from '../layout/customer-shell'
 import { FoodImg, type Tone } from '../ui/food-img'
@@ -244,6 +244,72 @@ function Skel({ h, w, style }: { h: number; w?: number | string; style?: React.C
 	)
 }
 
+// ─── Expandable description ───────────────────────────────────────────────────
+const CLAMP_LINES = 4
+const FONT_SIZE = 14.5
+const LINE_HEIGHT = 1.65
+const CLAMPED_MAX_H = CLAMP_LINES * FONT_SIZE * LINE_HEIGHT // ~95px
+
+function ExpandableDescription({ text }: { text: string }) {
+	const [expanded, setExpanded] = useState(false)
+	const [overflows, setOverflows] = useState(false)
+	const ref = useRef<HTMLParagraphElement>(null)
+
+	useEffect(() => {
+		const el = ref.current
+		if (!el) return
+		// Lift constraints temporarily to measure true height
+		el.style.maxHeight = 'none'
+		el.style.overflow = 'visible'
+		const fullH = el.scrollHeight
+		el.style.maxHeight = ''
+		el.style.overflow = ''
+		setOverflows(fullH > Math.ceil(CLAMPED_MAX_H))
+	}, [text])
+
+	return (
+		<div style={{ marginBottom: 20 }}>
+			<p
+				ref={ref}
+				style={{
+					fontSize: FONT_SIZE,
+					lineHeight: LINE_HEIGHT,
+					color: 'var(--bf-ink-2)',
+					maxWidth: 440,
+					wordBreak: 'break-word',
+					overflowWrap: 'break-word',
+					overflow: 'hidden',
+					maxHeight: expanded ? 'none' : `${CLAMPED_MAX_H}px`,
+					transition: 'max-height 0.3s ease',
+				}}
+			>
+				{text}
+			</p>
+			{overflows && (
+				<button
+					onClick={() => setExpanded((v) => !v)}
+					style={{
+						marginTop: 6,
+						background: 'none',
+						border: 'none',
+						padding: 0,
+						cursor: 'pointer',
+						fontSize: 13,
+						fontWeight: 700,
+						color: 'var(--bf-ember)',
+						fontFamily: 'var(--bf-font)',
+						display: 'flex',
+						alignItems: 'center',
+						gap: 4,
+					}}
+				>
+					{expanded ? 'Show less ↑' : 'Read more ↓'}
+				</button>
+			)}
+		</div>
+	)
+}
+
 // ─── PRODUCT DETAIL ───────────────────────────────────────────────────────────
 function ProductDetailPage({ productId }: { productId: number }) {
 	const router = useRouter()
@@ -472,17 +538,7 @@ function ProductDetailPage({ productId }: { productId: number }) {
 
 							{/* Description */}
 							{product.description && (
-								<p
-									style={{
-										fontSize: 14.5,
-										lineHeight: 1.65,
-										color: 'var(--bf-ink-2)',
-										marginBottom: 20,
-										maxWidth: 400,
-									}}
-								>
-									{product.description}
-								</p>
+								<ExpandableDescription text={product.description} />
 							)}
 
 							<hr className='bf-rule' style={{ marginBottom: 20 }} />

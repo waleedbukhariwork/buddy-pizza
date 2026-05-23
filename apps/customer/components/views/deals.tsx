@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { CustomerShell } from '../layout/customer-shell'
 import { DealCard } from '../home/home-primitives'
@@ -14,10 +14,78 @@ function Skel({ h, style }: { h: number; style?: React.CSSProperties }) {
 	return <div className='bf-skeleton' style={{ height: h, ...style }} />
 }
 
+function useReveal() {
+	const ref = useRef<HTMLElement>(null)
+	useEffect(() => {
+		const el = ref.current
+		if (!el) return
+		const io = new IntersectionObserver(
+			([entry]) => {
+				if (entry.isIntersecting) {
+					el.classList.add('bf-in')
+					io.disconnect()
+				}
+			},
+			{ threshold: 0.08 },
+		)
+		io.observe(el)
+		return () => io.disconnect()
+	}, [])
+	return ref
+}
+
+function useCountUpValue(target: number, active: boolean, duration = 1400): number {
+	const [value, setValue] = useState(0)
+	useEffect(() => {
+		if (!active) return
+		setValue(0)
+		const start = performance.now()
+		let raf: number
+		const tick = (now: number) => {
+			const t = Math.min((now - start) / duration, 1)
+			const eased = 1 - Math.pow(1 - t, 4)
+			setValue(Math.round(eased * target))
+			if (t < 1) raf = requestAnimationFrame(tick)
+		}
+		raf = requestAnimationFrame(tick)
+		return () => cancelAnimationFrame(raf)
+	}, [active, target, duration])
+	return value
+}
+
+function GridReveal({ children }: { children: React.ReactNode }) {
+	const ref = useReveal()
+	return <div ref={ref as React.RefObject<HTMLDivElement>} className='bf-reveal'>{children}</div>
+}
+
 function DealsExperience() {
 	const router = useRouter()
 	const { data: deals, isLoading } = useDeals()
 	const [activeTag, setActiveTag] = useState<string | null>(null)
+	const [mounted, setMounted] = useState(false)
+	const [statsInView, setStatsInView] = useState(false)
+	const statsRef = useRef<HTMLDivElement>(null)
+
+	useEffect(() => {
+		const t = setTimeout(() => setMounted(true), 80)
+		return () => clearTimeout(t)
+	}, [])
+
+	useEffect(() => {
+		const el = statsRef.current
+		if (!el) return
+		const io = new IntersectionObserver(
+			([entry]) => {
+				if (entry.isIntersecting) {
+					setStatsInView(true)
+					io.disconnect()
+				}
+			},
+			{ threshold: 0.2 },
+		)
+		io.observe(el)
+		return () => io.disconnect()
+	}, [])
 
 	const activeDeals = useMemo(() => deals?.filter(d => d.isActive) ?? [], [deals])
 
@@ -30,6 +98,7 @@ function DealsExperience() {
 	})
 
 	const { isSearchMode, searchQ } = search
+	const countedDeals = useCountUpValue(activeDeals.length, statsInView && !isSearchMode)
 
 	useEffect(() => {
 		const q = new URLSearchParams(window.location.search).get('q')
@@ -56,60 +125,9 @@ function DealsExperience() {
 	return (
 		<CustomerShell activePage='deals'>
 			<main>
-				{/* ── Tag filter strip — hidden in search mode (matches menu category strip behavior) ── */}
-				{!isSearchMode && (
-					<div className='bf-menu-cat-strip'>
-						<div className='bf-menu-cat-strip-inner bf-scroll' style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12 }}>
-							{isLoading
-								? Array.from({ length: 4 }).map((_, i) => (
-									<Skel key={i} h={44} style={{ width: 100, borderRadius: 0, flexShrink: 0 }} />
-								))
-								: (
-									<>
-										<button
-											className='bf-btn bf-btn-md'
-											onClick={() => setActiveTag(null)}
-											style={{
-												background: activeTag === null ? 'var(--bf-ink)' : 'transparent',
-												color: activeTag === null ? '#fff' : 'var(--bf-ink-2)',
-												padding: '12px 18px', borderRadius: 0, flexShrink: 0,
-												borderBottom: activeTag === null ? '3px solid var(--bf-ember)' : '3px solid transparent',
-												fontWeight: 700,
-											}}
-										>
-											All{' '}
-											<span className='bf-mono' style={{ opacity: 0.6, fontSize: 11 }}>{activeDeals.length}</span>
-										</button>
-										{tags.map(tag => {
-											const count = activeDeals.filter(d => d.tag === tag).length
-											return (
-												<button
-													key={tag}
-													className='bf-btn bf-btn-md'
-													onClick={() => setActiveTag(tag)}
-													style={{
-														background: activeTag === tag ? 'var(--bf-ink)' : 'transparent',
-														color: activeTag === tag ? '#fff' : 'var(--bf-ink-2)',
-														padding: '12px 18px', borderRadius: 0, flexShrink: 0,
-														borderBottom: activeTag === tag ? '3px solid var(--bf-ember)' : '3px solid transparent',
-														fontWeight: 700,
-													}}
-												>
-													{tag}{' '}
-													<span className='bf-mono' style={{ opacity: 0.6, fontSize: 11 }}>{count}</span>
-												</button>
-											)
-										})}
-									</>
-								)
-							}
-						</div>
-					</div>
-				)}
-
-				<div className='bf-page-main'>
+<div className='bf-page-main'>
 					{/* ── Header ── */}
-					<div style={{ marginBottom: 18 }}>
+					<div ref={statsRef as React.RefObject<HTMLDivElement>} style={{ marginBottom: 18 }}>
 						{isLoading ? (
 							<>
 								<Skel h={12} style={{ width: 120, marginBottom: 8 }} />
@@ -117,12 +135,12 @@ function DealsExperience() {
 							</>
 						) : (
 							<>
-								<div className='bf-eyebrow'>
+								<div className={`bf-eyebrow${mounted ? ' bf-rw' : ''}`} style={{ '--d': '0s' } as React.CSSProperties}>
 									{isSearchMode
 										? `${visible.length} RESULT${visible.length !== 1 ? 'S' : ''}`
-										: `${activeTag ? `${activeTag.toUpperCase()} · ` : ''}${visible.length} DEAL${visible.length !== 1 ? 'S' : ''}`}
+										: `${activeTag ? `${activeTag.toUpperCase()} · ` : ''}${countedDeals} DEAL${(isSearchMode ? visible.length : countedDeals) !== 1 ? 'S' : ''}`}
 								</div>
-								<h1 style={{ fontWeight: 800, fontSize: 'clamp(28px, 8vw, 44px)', margin: '6px 0 0', letterSpacing: '-0.028em' }}>
+								<h1 className={`${mounted ? ' bf-rw' : ''}`} style={{ fontWeight: 800, fontSize: 'clamp(28px, 8vw, 44px)', margin: '6px 0 0', letterSpacing: '-0.028em', '--d': '0.14s' } as React.CSSProperties}>
 									{isSearchMode ? <>&ldquo;{searchQ}&rdquo;</> : (activeTag ?? 'All Deals')}
 								</h1>
 							</>
@@ -189,11 +207,13 @@ function DealsExperience() {
 							)}
 						</div>
 					) : (
-						<div className='bf-deals-grid-page'>
-							{visible.map((deal, i) => (
-								<DealCard key={deal.id} d={deal} tone={TONES[i % TONES.length]} />
-							))}
-						</div>
+						<GridReveal>
+							<div className='bf-deals-grid-page'>
+								{visible.map((deal, i) => (
+									<DealCard key={deal.id} d={deal} tone={TONES[i % TONES.length]} />
+								))}
+							</div>
+						</GridReveal>
 					)}
 				</div>
 			</main>

@@ -41,6 +41,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
 			}}
 		>
 			<header
+				className='bf-auth-header'
 				style={{
 					padding: '20px 32px',
 					display: 'flex',
@@ -75,6 +76,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
 				{children}
 			</div>
 			<footer
+				className='bf-auth-footer'
 				style={{
 					padding: '16px 32px',
 					borderTop: '1px solid var(--bf-line)',
@@ -623,6 +625,7 @@ function OtpStep({ identifier, onBack, onSuccess }: OtpStepProps) {
 			{/* OTP digit boxes — flex:1 so they fill width on any phone size */}
 			<div
 				onPaste={handlePaste}
+				className='bf-auth-otp-gap'
 				style={{ display: 'flex', gap: 8, marginBottom: 8 }}
 			>
 				{digits.map((digit, i) => (
@@ -631,6 +634,7 @@ function OtpStep({ identifier, onBack, onSuccess }: OtpStepProps) {
 						ref={(el) => {
 							inputRefs.current[i] = el
 						}}
+						className='bf-auth-otp-input'
 						type='text'
 						inputMode='numeric'
 						maxLength={1}
@@ -734,8 +738,9 @@ function OtpStep({ identifier, onBack, onSuccess }: OtpStepProps) {
 				{!canResend ? (
 					<p style={{ fontSize: 13, color: 'var(--bf-mute)' }}>
 						Resend code in{' '}
-						<span
-							style={{
+				<span
+					className='bf-auth-header-location'
+					style={{
 								fontFamily: 'var(--bf-mono)',
 								fontWeight: 700,
 								color: 'var(--bf-ink-2)',
@@ -801,10 +806,25 @@ function AuthSignIn() {
 	const [showPw, setShowPw] = useState(false)
 	const [isLoading, setIsLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [fieldErrors, setFieldErrors] = useState<{ field: string; message: string }[]>([])
+
+	function fieldHasError(field: string) {
+		return fieldErrors.some((e) => e.field === field)
+	}
 
 	async function handleSubmit(e: React.FormEvent) {
 		e.preventDefault()
 		setError(null)
+		const errors: { field: string; message: string }[] = []
+		if (!email.trim())
+			errors.push({ field: 'email', message: 'Enter your email address to sign in.' })
+		if (!password)
+			errors.push({ field: 'password', message: 'Enter your password to continue.' })
+		if (errors.length) {
+			setFieldErrors(errors)
+			return
+		}
+		setFieldErrors([])
 		setIsLoading(true)
 		try {
 			const { data } = await apiClient.post<AuthResponse>(
@@ -929,15 +949,18 @@ function AuthSignIn() {
 								</span>
 								<input
 									className='bf-input'
-									style={{ paddingLeft: 40 }}
+									style={{
+										paddingLeft: 40,
+										borderColor: fieldHasError('email') ? 'var(--bf-error)' : undefined,
+									}}
 									type='email'
 									placeholder='email@example.com'
 									value={email}
 									onChange={(e) => {
 										setEmail(e.target.value)
 										setError(null)
+										setFieldErrors([])
 									}}
-									required
 									autoComplete='email'
 									autoFocus
 								/>
@@ -994,12 +1017,18 @@ function AuthSignIn() {
 								</span>
 								<input
 									className='bf-input'
-									style={{ paddingLeft: 40, paddingRight: 46 }}
+									style={{
+										paddingLeft: 40,
+										paddingRight: 46,
+										borderColor: fieldHasError('password') ? 'var(--bf-error)' : undefined,
+									}}
 									type={showPw ? 'text' : 'password'}
 									placeholder='Your password'
 									value={password}
-									onChange={(e) => setPassword(e.target.value)}
-									required
+									onChange={(e) => {
+										setPassword(e.target.value)
+										setFieldErrors([])
+									}}
 									autoComplete='current-password'
 								/>
 								<button
@@ -1023,7 +1052,9 @@ function AuthSignIn() {
 							</div>
 						</div>
 
-						{error && <ErrorBanner message={error} />}
+						{(fieldErrors.length > 0 || error) && (
+							<ErrorBanner message={fieldErrors[0]?.message || error || ''} />
+						)}
 
 						<button
 							className='bf-btn bf-btn-primary bf-btn-lg'
@@ -1139,12 +1170,17 @@ function AuthSignUp() {
 	const [showPw, setShowPw] = useState(false)
 	const [isLoading, setIsLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+	const [fieldErrors, setFieldErrors] = useState<{ field: string; message: string }[]>([])
 	const [identifierTouched, setIdentifierTouched] = useState(false)
 
 	// Identifier validation state
 	const identifierValid = isValidEmail(identifier)
 	const identifierHasContent = identifier.trim().length > 0
 	const showIdentifierFeedback = identifierHasContent && identifierTouched
+
+	function fieldHasError(field: string) {
+		return fieldErrors.some((e) => e.field === field)
+	}
 
 	// Password strength
 	type Strength = 0 | 1 | 2 | 3
@@ -1172,8 +1208,23 @@ function AuthSignUp() {
 	async function handleFormSubmit(e: React.FormEvent) {
 		e.preventDefault()
 		setIdentifierTouched(true)
-		if (!identifierValid) return
 		setError(null)
+		const errors: { field: string; message: string }[] = []
+		if (!name.trim())
+			errors.push({ field: 'name', message: 'Enter your name to create an account.' })
+		if (!identifier.trim())
+			errors.push({ field: 'identifier', message: 'Enter your email address to continue.' })
+		else if (!isValidEmail(identifier.trim()))
+			errors.push({ field: 'identifier', message: 'Enter a valid email address (e.g. name@example.com).' })
+		if (!password)
+			errors.push({ field: 'password', message: 'Choose a password for your account.' })
+		else if (password.length < 8)
+			errors.push({ field: 'password', message: 'Password must be at least 8 characters.' })
+		if (errors.length) {
+			setFieldErrors(errors)
+			return
+		}
+		setFieldErrors([])
 		setIsLoading(true)
 		try {
 			const { data } = await apiClient.post<InitiateResponse>(
@@ -1365,11 +1416,16 @@ function AuthSignUp() {
 								</span>
 								<input
 									className='bf-input'
-									style={{ paddingLeft: 40 }}
+									style={{
+										paddingLeft: 40,
+										borderColor: fieldHasError('name') ? 'var(--bf-error)' : undefined,
+									}}
 									placeholder='Ayesha Khan'
 									value={name}
-									onChange={(e) => setName(e.target.value)}
-									required
+									onChange={(e) => {
+										setName(e.target.value)
+										setFieldErrors([])
+									}}
 									autoComplete='name'
 									autoFocus
 								/>
@@ -1409,8 +1465,9 @@ function AuthSignUp() {
 									className='bf-input'
 									style={{
 										paddingLeft: 40,
-										borderColor:
-											showIdentifierFeedback && !identifierValid
+										borderColor: fieldHasError('identifier')
+											? 'var(--bf-error)'
+											: showIdentifierFeedback && !identifierValid
 												? 'var(--bf-error)'
 												: showIdentifierFeedback && identifierValid
 													? 'var(--bf-leaf)'
@@ -1422,9 +1479,9 @@ function AuthSignUp() {
 									onChange={(e) => {
 										setIdentifier(e.target.value)
 										setError(null)
+										setFieldErrors([])
 									}}
 									onBlur={() => setIdentifierTouched(true)}
-									required
 									autoComplete='email'
 									inputMode='email'
 								/>
@@ -1463,13 +1520,18 @@ function AuthSignUp() {
 								</span>
 								<input
 									className='bf-input'
-									style={{ paddingLeft: 40, paddingRight: 46 }}
+									style={{
+										paddingLeft: 40,
+										paddingRight: 46,
+										borderColor: fieldHasError('password') ? 'var(--bf-error)' : undefined,
+									}}
 									type={showPw ? 'text' : 'password'}
 									placeholder='Min. 8 characters'
 									value={password}
-									onChange={(e) => setPassword(e.target.value)}
-									required
-									minLength={8}
+									onChange={(e) => {
+										setPassword(e.target.value)
+										setFieldErrors([])
+									}}
 									autoComplete='new-password'
 								/>
 								<button
@@ -1532,7 +1594,9 @@ function AuthSignUp() {
 							)}
 						</div>
 
-						{error && <ErrorBanner message={error} />}
+												{(fieldErrors.length > 0 || error) && (
+							<ErrorBanner message={fieldErrors[0]?.message || error || ''} />
+						)}
 
 						<p
 							style={{ fontSize: 12, color: 'var(--bf-mute)', lineHeight: 1.5 }}

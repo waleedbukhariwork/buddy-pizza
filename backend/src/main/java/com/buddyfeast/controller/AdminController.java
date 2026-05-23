@@ -14,6 +14,7 @@ import com.buddyfeast.service.AdminService;
 import com.buddyfeast.service.DealService;
 import com.buddyfeast.service.OrderService;
 import com.buddyfeast.service.ProductService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -50,12 +51,12 @@ public class AdminController {
     }
     
     @PostMapping("/products")
-    public ResponseEntity<Product> createProduct(@RequestBody ProductDTO product) {
+    public ResponseEntity<Product> createProduct(@Valid @RequestBody ProductDTO product) {
         return ResponseEntity.ok(productService.createProduct(product));
     }
-    
+
     @PutMapping("/products/{id}")
-    public ResponseEntity<Product> updateProduct(@PathVariable Long id, @RequestBody ProductDTO product) {
+    public ResponseEntity<Product> updateProduct(@PathVariable Long id, @Valid @RequestBody ProductDTO product) {
         return ResponseEntity.ok(productService.updateProduct(id, product));
     }
     
@@ -103,13 +104,13 @@ public class AdminController {
     }
 
     @PostMapping("/deals")
-    public ResponseEntity<DealDTO> createDeal(@RequestBody Deal deal) {
+    public ResponseEntity<DealDTO> createDeal(@Valid @RequestBody Deal deal) {
         Deal created = dealService.createDeal(deal);
         return ResponseEntity.ok(dealService.getDealById(created.getId()));
     }
 
     @PutMapping("/deals/{id}")
-    public ResponseEntity<DealDTO> updateDeal(@PathVariable Long id, @RequestBody Deal deal) {
+    public ResponseEntity<DealDTO> updateDeal(@PathVariable Long id, @Valid @RequestBody Deal deal) {
         dealService.updateDeal(id, deal);
         return ResponseEntity.ok(dealService.getDealById(id));
     }

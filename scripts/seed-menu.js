@@ -13,8 +13,9 @@
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const CONFIG = {
-	apiBase: process.env.API_URL ?? 'http://localhost:8080/api',
-	email: process.env.ADMIN_EMAIL ?? 'admin@buddyfeast.com',
+	// apiBase: process.env.API_URL ?? 'http://localhost:8080/api',
+	apiBase: 'https://buddy-feast-api.onrender.com/api',
+	email: process.env.ADMIN_EMAIL ?? 'devAdmin@buddyfeast.com',
 	password: process.env.ADMIN_PASSWORD ?? 'admin123',
 }
 
@@ -33,7 +34,11 @@ async function api(method, path, body) {
 	const text = await res.text()
 	if (!res.ok) throw new Error(`${method} ${path} → ${res.status}: ${text}`)
 	if (!text) return null
-	try { return JSON.parse(text) } catch { return text }
+	try {
+		return JSON.parse(text)
+	} catch {
+		return text
+	}
 }
 
 async function login() {
@@ -41,6 +46,8 @@ async function login() {
 		phoneOrEmail: CONFIG.email,
 		password: CONFIG.password,
 	})
+
+	console.log({ data })
 	token = data.token
 	console.log('✅  Logged in as admin')
 }
@@ -52,8 +59,18 @@ async function login() {
  * sizes: Array of { name: string, price: number }
  *   e.g. [{ name: 'Small (6")', price: 330 }, { name: 'Medium (9")', price: 650 }]
  */
-function sized(name, sizes, { isHot = false, description = '', discountPct = null, discountAmount = null } = {}) {
-	if (!sizes || sizes.length === 0) throw new Error(`sized(): no sizes provided for "${name}"`)
+function sized(
+	name,
+	sizes,
+	{
+		isHot = false,
+		description = '',
+		discountPct = null,
+		discountAmount = null,
+	} = {},
+) {
+	if (!sizes || sizes.length === 0)
+		throw new Error(`sized(): no sizes provided for "${name}"`)
 	const sorted = [...sizes].sort((a, b) => a.price - b.price)
 	return {
 		name,
@@ -61,12 +78,12 @@ function sized(name, sizes, { isHot = false, description = '', discountPct = nul
 		hasSizes: true,
 		price: sorted[0].price,
 		// Legacy compat fields (first 3)
-		priceSmall:  sorted[0]?.price  ?? null,
-		priceMedium: sorted[1]?.price  ?? null,
-		priceLarge:  sorted[2]?.price  ?? null,
-		labelSmall:  sorted[0]?.name   ?? null,
-		labelMedium: sorted[1]?.name   ?? null,
-		labelLarge:  sorted[2]?.name   ?? null,
+		priceSmall: sorted[0]?.price ?? null,
+		priceMedium: sorted[1]?.price ?? null,
+		priceLarge: sorted[2]?.price ?? null,
+		labelSmall: sorted[0]?.name ?? null,
+		labelMedium: sorted[1]?.name ?? null,
+		labelLarge: sorted[2]?.name ?? null,
 		// Full list for unlimited-size support
 		sizesJson: JSON.stringify(sorted),
 		isHot,
@@ -80,14 +97,27 @@ function sized(name, sizes, { isHot = false, description = '', discountPct = nul
  * single(name, price, opts)
  * Simple product with one price.
  */
-function single(name, price, { isHot = false, description = '', discountPct = null, discountAmount = null } = {}) {
+function single(
+	name,
+	price,
+	{
+		isHot = false,
+		description = '',
+		discountPct = null,
+		discountAmount = null,
+	} = {},
+) {
 	return {
 		name,
 		description: description || null,
 		hasSizes: false,
 		price,
-		priceSmall: null, priceMedium: null, priceLarge: null,
-		labelSmall: null, labelMedium: null, labelLarge: null,
+		priceSmall: null,
+		priceMedium: null,
+		priceLarge: null,
+		labelSmall: null,
+		labelMedium: null,
+		labelLarge: null,
 		sizesJson: null,
 		isHot,
 		isAvailable: true,
@@ -100,27 +130,39 @@ function single(name, price, { isHot = false, description = '', discountPct = nu
 
 /** Regular pizza with Small (6") / Medium (9") / Large (12") */
 function pizza(name, s, m, l, isHot = false) {
-	return sized(name, [
-		{ name: 'Small (6")',  price: s },
-		{ name: 'Medium (9")', price: m },
-		{ name: 'Large (12")', price: l },
-	], { isHot })
+	return sized(
+		name,
+		[
+			{ name: 'Small (6")', price: s },
+			{ name: 'Medium (9")', price: m },
+			{ name: 'Large (12")', price: l },
+		],
+		{ isHot },
+	)
 }
 
 /** Pizza available in Medium (9") and Large (12") only */
 function pizzaML(name, m, l, isHot = false) {
-	return sized(name, [
-		{ name: 'Medium (9")',  price: m },
-		{ name: 'Large (12")', price: l },
-	], { isHot, description: 'Available in Medium (9") and Large (12")' })
+	return sized(
+		name,
+		[
+			{ name: 'Medium (9")', price: m },
+			{ name: 'Large (12")', price: l },
+		],
+		{ isHot, description: 'Available in Medium (9") and Large (12")' },
+	)
 }
 
 /** Half / Full item (pasta, wings, Turkish doner) */
 function halfFull(name, half, full, description = '') {
-	return sized(name, [
-		{ name: 'Half', price: half },
-		{ name: 'Full', price: full },
-	], { description })
+	return sized(
+		name,
+		[
+			{ name: 'Half', price: half },
+			{ name: 'Full', price: full },
+		],
+		{ description },
+	)
 }
 
 // ─── MENU DATA ────────────────────────────────────────────────────────────────
@@ -131,27 +173,27 @@ const MENU = [
 		displayOrder: 1,
 		products: [
 			// ─ Regular Pizzas: Small (6") / Medium (9") / Large (12")
-			pizza('Chicken Tikka',    330, 650, 930, true),
-			pizza('Chicken Fajita',   330, 650, 930),
+			pizza('Chicken Tikka', 330, 650, 930, true),
+			pizza('Chicken Fajita', 330, 650, 930),
 			pizza('Chicken Tandoori', 330, 650, 930),
 			pizza('Chicken Sicilian', 330, 650, 930),
 
 			// ─ Special Pizzas: Medium (9") / Large (12") only
-			pizzaML('Feast Special',          799, 1099, true),
-			pizzaML('Behari Seekh Kabab',     799, 1099, true),
-			pizzaML('Chunky Cheese Kabab',    799,  999),
-			pizzaML('Malai Boti',             749,  999),
-			pizzaML('Hot & Spicy',            749,  999, true),
-			pizzaML('Bonfire',                749,  999),
-			pizzaML('Peri Peri',              749,  999),
-			pizzaML('Shahi',                  749,  999),
-			pizzaML('Supreme',                749,  999),
+			pizzaML('Feast Special', 799, 1099, true),
+			pizzaML('Behari Seekh Kabab', 799, 1099, true),
+			pizzaML('Chunky Cheese Kabab', 799, 999),
+			pizzaML('Malai Boti', 749, 999),
+			pizzaML('Hot & Spicy', 749, 999, true),
+			pizzaML('Bonfire', 749, 999),
+			pizzaML('Peri Peri', 749, 999),
+			pizzaML('Shahi', 749, 999),
+			pizzaML('Supreme', 749, 999),
 
 			// ─ Extreme / Crown Crust: Medium (9") / Large (12") only
 			pizzaML('Makhni Kabab (Crown Crust)', 899, 1199),
-			pizzaML('Seekh Kabab (Crown Crust)',  899, 1199),
-			pizzaML('Cheese Crust',               899, 1199),
-			pizzaML('Crown Crust',                899, 1199),
+			pizzaML('Seekh Kabab (Crown Crust)', 899, 1199),
+			pizzaML('Cheese Crust', 899, 1199),
+			pizzaML('Crown Crust', 899, 1199),
 		],
 	},
 
@@ -165,11 +207,11 @@ const MENU = [
 			single('Steak & Cheese Burger', 449),
 			// Fried
 			single('Feast Special Zinger Burger', 299, { isHot: true }),
-			single('Chicken Petty Burger',         199),
-			single('Classic Zinger Burger',         249),
-			single('Chipotle Jalapeno Burger',       349),
-			single('Double Dose Burger',             399),
-			single('Monster Burger',                 480, { isHot: true }),
+			single('Chicken Petty Burger', 199),
+			single('Classic Zinger Burger', 249),
+			single('Chipotle Jalapeno Burger', 349),
+			single('Double Dose Burger', 399),
+			single('Monster Burger', 480, { isHot: true }),
 		],
 	},
 
@@ -179,11 +221,11 @@ const MENU = [
 		displayOrder: 3,
 		products: [
 			single('Feast Special Paratha Roll', 300),
-			single('Tikka Paratha Roll',          199),
-			single('Loaded Paratha Roll',          259),
-			single('Zinger Paratha Roll',          250),
-			single('Tikka Cheese Paratha Roll',    250),
-			single('Behari Kabab Paratha Roll',    250),
+			single('Tikka Paratha Roll', 199),
+			single('Loaded Paratha Roll', 259),
+			single('Zinger Paratha Roll', 250),
+			single('Tikka Cheese Paratha Roll', 250),
+			single('Behari Kabab Paratha Roll', 250),
 		],
 	},
 
@@ -192,9 +234,9 @@ const MENU = [
 		category: 'Wings',
 		displayOrder: 4,
 		products: [
-			halfFull('Grilled Wings',  170, 320),
-			halfFull('Flaming Wings',  200, 380, 'Spicy'),
-			halfFull('B.B.Q Wings',    200, 380),
+			halfFull('Grilled Wings', 170, 320),
+			halfFull('Flaming Wings', 200, 380, 'Spicy'),
+			halfFull('B.B.Q Wings', 200, 380),
 		],
 	},
 
@@ -203,12 +245,12 @@ const MENU = [
 		category: 'Fries',
 		displayOrder: 5,
 		products: [
-			single('Plain Fries',         170),
-			single('Masala Fries',         199),
-			single('Jalapeno Fries',       240),
-			single('Loaded Fries',         299),
-			single('Crispy Loaded Fries',  350),
-			single('Pizza Fries',          380),
+			single('Plain Fries', 170),
+			single('Masala Fries', 199),
+			single('Jalapeno Fries', 240),
+			single('Loaded Fries', 299),
+			single('Crispy Loaded Fries', 350),
+			single('Pizza Fries', 380),
 		],
 	},
 
@@ -217,9 +259,9 @@ const MENU = [
 		category: 'Pasta',
 		displayOrder: 6,
 		products: [
-			halfFull('Flaming Pasta',      260, 480, 'Spicy'),
-			halfFull('Buddy Feast Pasta',  280, 499),
-			halfFull('Crispy Pasta',       320, 599),
+			halfFull('Flaming Pasta', 260, 480, 'Spicy'),
+			halfFull('Buddy Feast Pasta', 280, 499),
+			halfFull('Crispy Pasta', 320, 599),
 		],
 	},
 
@@ -228,8 +270,8 @@ const MENU = [
 		category: 'Turkish Food',
 		displayOrder: 7,
 		products: [
-			halfFull('Classic Turkish Doner',  399, 749),
-			halfFull('Premium Turkish Doner',  460, 799),
+			halfFull('Classic Turkish Doner', 399, 749),
+			halfFull('Premium Turkish Doner', 460, 799),
 		],
 	},
 
@@ -238,9 +280,9 @@ const MENU = [
 		category: 'Shawarma',
 		displayOrder: 8,
 		products: [
-			single('Tikka Shawarma',  180),
+			single('Tikka Shawarma', 180),
 			single('Zinger Shawarma', 230),
-			single('Feast Shawarma',  230),
+			single('Feast Shawarma', 230),
 		],
 	},
 
@@ -249,10 +291,10 @@ const MENU = [
 		category: 'Appetizers',
 		displayOrder: 9,
 		products: [
-			single('Nuggets (5 Pcs)',    199),
-			single('Boneless Thigh',     199),
+			single('Nuggets (5 Pcs)', 199),
+			single('Boneless Thigh', 199),
 			single('Crispy Bites (8 Pcs)', 330),
-			single('Saucy Bites (8 Pcs)',  380),
+			single('Saucy Bites (8 Pcs)', 380),
 		],
 	},
 
@@ -261,8 +303,8 @@ const MENU = [
 		category: 'Soft Drinks',
 		displayOrder: 10,
 		products: [
-			single('Cold Drink (500ml)',    80),
-			single('Cold Drink (1 Ltr)',   110),
+			single('Cold Drink (500ml)', 80),
+			single('Cold Drink (1 Ltr)', 110),
 			single('Buddy Pack (1.5 Ltr)', 140),
 			single('Cold Drink (1.5 Ltr)', 170),
 		],
@@ -284,7 +326,9 @@ async function deleteAllProducts() {
 			await api('DELETE', `/v1/admin/products/${p.id}`)
 			deleted++
 		} catch (err) {
-			console.error(`    ⚠  Could not delete product ${p.id} (${p.name}): ${err.message}`)
+			console.error(
+				`    ⚠  Could not delete product ${p.id} (${p.name}): ${err.message}`,
+			)
 		}
 	}
 	console.log(`    ✅  Deleted ${deleted} product(s)`)
@@ -293,7 +337,7 @@ async function deleteAllProducts() {
 async function getExistingCategories() {
 	const cats = await api('GET', '/v1/admin/categories')
 	const map = {}
-	for (const c of (cats ?? [])) map[c.name.toLowerCase()] = c
+	for (const c of cats ?? []) map[c.name.toLowerCase()] = c
 	return map
 }
 
@@ -306,7 +350,7 @@ async function main() {
 	await login()
 
 	// 1. Clean all products
-	await deleteAllProducts()
+	// await deleteAllProducts()
 
 	// 2. Resolve categories (reuse existing by name, create if missing)
 	console.log('\n📁  Resolving categories…')
@@ -317,7 +361,9 @@ async function main() {
 		const key = section.category.toLowerCase()
 		if (existingCats[key]) {
 			catIdByName[section.category] = existingCats[key].id
-			console.log(`    ♻  Reused  "${section.category}" (id=${existingCats[key].id})`)
+			console.log(
+				`    ♻  Reused  "${section.category}" (id=${existingCats[key].id})`,
+			)
 		} else {
 			try {
 				const cat = await api('POST', '/v1/admin/categories', {
@@ -328,7 +374,9 @@ async function main() {
 				catIdByName[section.category] = cat.id
 				console.log(`    ✨ Created "${section.category}" (id=${cat.id})`)
 			} catch (err) {
-				console.error(`    ❌  Failed to create category "${section.category}": ${err.message}`)
+				console.error(
+					`    ❌  Failed to create category "${section.category}": ${err.message}`,
+				)
 			}
 		}
 	}
@@ -341,7 +389,9 @@ async function main() {
 	for (const section of MENU) {
 		const catId = catIdByName[section.category]
 		if (!catId) {
-			console.error(`\n   ⚠  Skipping "${section.category}" — no category ID resolved`)
+			console.error(
+				`\n   ⚠  Skipping "${section.category}" — no category ID resolved`,
+			)
 			continue
 		}
 
@@ -349,7 +399,10 @@ async function main() {
 
 		for (const product of section.products) {
 			try {
-				await api('POST', '/v1/admin/products', { ...product, categoryId: catId })
+				await api('POST', '/v1/admin/products', {
+					...product,
+					categoryId: catId,
+				})
 
 				// Nice price display
 				let priceStr
@@ -357,9 +410,10 @@ async function main() {
 					const sizes = JSON.parse(product.sizesJson)
 					const min = sizes[0]
 					const max = sizes[sizes.length - 1]
-					priceStr = sizes.length > 1
-						? `Rs.${min.price} – Rs.${max.price}  (${sizes.map(s => s.name).join(' / ')})`
-						: `Rs.${min.price}  (${min.name})`
+					priceStr =
+						sizes.length > 1
+							? `Rs.${min.price} – Rs.${max.price}  (${sizes.map((s) => s.name).join(' / ')})`
+							: `Rs.${min.price}  (${min.name})`
 				} else {
 					priceStr = `Rs.${product.price}`
 				}
@@ -380,13 +434,13 @@ async function main() {
 
 	if (errors.length > 0) {
 		console.log(`\n⚠️   ${errors.length} error(s):`)
-		errors.forEach(e => console.log(`    • ${e}`))
+		errors.forEach((e) => console.log(`    • ${e}`))
 	}
 
 	console.log('')
 }
 
-main().catch(err => {
+main().catch((err) => {
 	console.error('\n💥  Fatal error:', err.message)
 	process.exit(1)
 })

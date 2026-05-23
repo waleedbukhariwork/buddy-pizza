@@ -957,7 +957,7 @@ a {
 }
 
 /* ─── Auth page responsive ───────────────────────────────────────────────────── */
-@media (max-width: 639px) {
+@media (max-width: 767px) {
 	.bf-auth-grid {
 		grid-template-columns: 1fr !important;
 		max-width: 480px !important;
@@ -968,6 +968,25 @@ a {
 	.bf-auth-form-col {
 		border-left: none !important;
 		padding: 32px 20px !important;
+	}
+	.bf-auth-header {
+		padding: 16px 20px !important;
+	}
+	.bf-auth-header-location {
+		font-size: 10px !important;
+	}
+	.bf-auth-footer {
+		padding: 12px 20px !important;
+	}
+}
+
+@media (max-width: 400px) {
+	.bf-auth-otp-input {
+		max-width: 42px !important;
+		height: 48px !important;
+	}
+	.bf-auth-otp-gap {
+		gap: 6px !important;
 	}
 }
 
@@ -2144,6 +2163,11 @@ div.bf-search-result {
 	align-items: stretch;
 }
 
+.bf-favourites-grid > *,
+.bf-menu-products-grid > * {
+	min-width: 0;
+}
+
 /* Reorder card */
 .bf-reorder-section {
 	padding-top: 8px !important;
@@ -2217,7 +2241,12 @@ div.bf-search-result {
 	position: sticky;
 	top: 69px;
 	z-index: 10;
-	transition: top 0.22s ease-out;
+	transition: opacity 0.2s ease;
+}
+
+.bf-cat-strip-hidden {
+	opacity: 0;
+	pointer-events: none;
 }
 
 .bf-menu-cat-strip-inner {

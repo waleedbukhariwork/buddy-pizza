@@ -410,8 +410,11 @@ function FoodCard({
 					/>
 				)}
 				<div style={{ flex: 1, minWidth: 0 }}>
-					<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-						<div style={{ fontWeight: 800, fontSize: 16 }}>{item.name}</div>
+					<div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+						<div style={{
+							fontWeight: 800, fontSize: 16, flex: 1, minWidth: 0,
+							display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+						}}>{item.name}</div>
 						{item.isHot && <HotBadge />}
 					</div>
 					<div
@@ -420,6 +423,10 @@ function FoodCard({
 							fontSize: 12.5,
 							marginTop: 3,
 							lineHeight: 1.4,
+							display: '-webkit-box',
+							WebkitLineClamp: 2,
+							WebkitBoxOrient: 'vertical',
+							overflow: 'hidden',
 						}}
 					>
 						{item.description}
@@ -492,8 +499,11 @@ function FoodCard({
 
 			{/* Body — grows to fill card height so CTA always sits at the bottom */}
 			<div style={{ flex: 1, padding: '10px 4px 4px', display: 'flex', flexDirection: 'column' }}>
-				<div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-					<div style={{ fontWeight: 800, fontSize: 15, letterSpacing: '-0.01em' }}>
+				<div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+					<div style={{
+						fontWeight: 800, fontSize: 15, letterSpacing: '-0.01em', flex: 1, minWidth: 0,
+						display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+					}}>
 						{item.name}
 					</div>
 					{item.isHot && <HotBadge />}

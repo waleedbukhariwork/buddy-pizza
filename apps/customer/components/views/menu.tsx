@@ -5,7 +5,7 @@ import { CustomerShell } from '../layout/customer-shell'
 import { FoodCard } from '../menu/food-card'
 import { Icons } from '../ui/icon'
 import { CatIcon } from '../ui/cat-icon'
-import { useProducts, useCategories } from '../../lib/hooks'
+import { useProducts, useCategories, type Product, type Category } from '../../lib/hooks'
 import { type Tone } from '../ui/food-img'
 import { useRouter } from 'next/navigation'
 import { SearchField } from '../search/search-field'
@@ -70,6 +70,57 @@ function Pagination({ page, totalPages, onPage }: { page: number; totalPages: nu
 	)
 }
 
+// ─── Category section with scroll reveal ──────────────────────────────────────
+function MenuCategorySection({ section, view, si }: { section: { category: Category; items: Product[] }; view: 'list' | 'grid'; si: number }) {
+	const ref = useRef<HTMLElement>(null)
+	const { category, items } = section
+
+	useEffect(() => {
+		const el = ref.current
+		if (!el) return
+		const io = new IntersectionObserver(
+			([entry]) => {
+				if (entry.isIntersecting) {
+					el.classList.add('bf-in')
+					io.disconnect()
+				}
+			},
+			{ threshold: 0.08 },
+		)
+		io.observe(el)
+		return () => io.disconnect()
+	}, [])
+
+	return (
+		<section
+			ref={ref as React.RefObject<HTMLElement>}
+			id={`cat-${category.id}`}
+			className='bf-menu-section bf-reveal'
+		>
+			<h2 className='bf-menu-section-title'>
+				<CatIcon name={category.name} size={22} />
+				{category.name}
+				<span className='bf-mono' style={{ fontSize: 11, color: 'var(--bf-mute)', fontWeight: 600 }}>
+					{items.length}
+				</span>
+			</h2>
+			{view === 'list' ? (
+				<div className='bf-menu-products-list'>
+					{items.map((it, i) => (
+						<FoodCard key={it.id} item={it} variant='list' tone={TONES[(si + i) % 3]} />
+					))}
+				</div>
+			) : (
+				<div className='bf-menu-products-grid'>
+					{items.map((it, i) => (
+						<FoodCard key={it.id} item={it} variant='grid' tone={TONES[(si + i) % 3]} />
+					))}
+				</div>
+			)}
+		</section>
+	)
+}
+
 // ─── MENU ─────────────────────────────────────────────────────────────────────
 function MenuExperience() {
 	const [activeId, setActiveId] = useState<number | null>(null)
@@ -77,12 +128,19 @@ function MenuExperience() {
 
 	const [canScrollLeft, setCanScrollLeft] = useState(false)
 	const [canScrollRight, setCanScrollRight] = useState(false)
+	const [catStripHidden, setCatStripHidden] = useState(false)
+	const [mounted, setMounted] = useState(false)
 
 	const router = useRouter()
 	const search = useProductSearchField({
 		onCommit: (q) => router.replace(`/menu?q=${encodeURIComponent(q)}`, { scroll: false }),
 		onClear: () => router.replace('/menu', { scroll: false }),
 	})
+
+	useEffect(() => {
+		const t = setTimeout(() => setMounted(true), 80)
+		return () => clearTimeout(t)
+	}, [])
 
 	const catStripRef = useRef<HTMLDivElement>(null)
 	const tabsScrollRef = useRef<HTMLDivElement>(null)
@@ -126,8 +184,35 @@ function MenuExperience() {
 		if (typeof window !== 'undefined' && window.innerWidth < 768) setView('list')
 	}, [])
 
-	// No hide-on-scroll needed — the header is fixed and the category strip
-	// is sticky below it via CSS (top: 69px / 57px).
+	// Hide category strip on scroll down, reveal on scroll up
+	useEffect(() => {
+		let prevY = window.scrollY
+		let downAccum = 0
+
+		const handleScroll = () => {
+			const y = window.scrollY
+			const headerH = window.innerWidth < 960 ? 57 : 69
+
+			if (y <= headerH + 10) {
+				setCatStripHidden(false)
+				downAccum = 0
+			} else if (y < prevY) {
+				setCatStripHidden(false)
+				downAccum = 0
+			} else if (y > prevY) {
+				downAccum += y - prevY
+				if (downAccum > 40) {
+					setCatStripHidden(true)
+					downAccum = 0
+				}
+			}
+
+			prevY = y
+		}
+
+		window.addEventListener('scroll', handleScroll, { passive: true })
+		return () => window.removeEventListener('scroll', handleScroll)
+	}, [])
 
 	// Scroll active category tab into view (horizontal only — avoid scrollIntoView which also scrolls the page)
 	useEffect(() => {
@@ -216,7 +301,7 @@ function MenuExperience() {
 			<main>
 				{/* Category strip — hidden while in search mode */}
 				{!isSearchMode && (
-					<div ref={catStripRef} className='bf-menu-cat-strip'>
+					<div ref={catStripRef} className={`bf-menu-cat-strip${catStripHidden ? ' bf-cat-strip-hidden' : ''}`}>
 						<div className='bf-menu-cat-strip-inner'>
 
 							{/* Left fade + scroll arrow */}
@@ -298,8 +383,12 @@ function MenuExperience() {
 								</>
 							) : (
 								<>
-									<div className='bf-eyebrow'>FULL MENU · {totalMenuItems} ITEMS</div>
-									<h1 className='bf-menu-page-title'>Order your feast</h1>
+									<div className={`bf-eyebrow${mounted ? ' bf-rw' : ''}`} style={{ '--d': '0s' } as React.CSSProperties}>
+										FULL MENU · {totalMenuItems} ITEMS
+									</div>
+									<h1 className={`bf-menu-page-title${mounted ? ' bf-rw' : ''}`} style={{ '--d': '0.14s' } as React.CSSProperties}>
+										Order your feast
+									</h1>
 								</>
 							)}
 						</div>
@@ -433,33 +522,8 @@ function MenuExperience() {
 							</div>
 						) : (
 							categorySections.map((section, si) => (
-								<section
-									key={section.category.id}
-									id={`cat-${section.category.id}`}
-									className='bf-menu-section'
-								>
-									<h2 className='bf-menu-section-title'>
-										<CatIcon name={section.category.name} size={22} />
-										{section.category.name}
-										<span className='bf-mono' style={{ fontSize: 11, color: 'var(--bf-mute)', fontWeight: 600 }}>
-											{section.items.length}
-										</span>
-									</h2>
-									{view === 'list' ? (
-										<div className='bf-menu-products-list'>
-											{section.items.map((it, i) => (
-												<FoodCard key={it.id} item={it} variant='list' tone={TONES[(si + i) % 3]} />
-											))}
-										</div>
-									) : (
-										<div className='bf-menu-products-grid'>
-											{section.items.map((it, i) => (
-												<FoodCard key={it.id} item={it} variant='grid' tone={TONES[(si + i) % 3]} />
-											))}
-										</div>
-									)}
-								</section>
-							))
+							<MenuCategorySection key={section.category.id} section={section} view={view} si={si} />
+						))
 						)
 					)}
 				</div>

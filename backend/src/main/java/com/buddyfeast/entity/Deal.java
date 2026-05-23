@@ -1,6 +1,7 @@
 package com.buddyfeast.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 import java.time.LocalDateTime;
 
@@ -17,6 +18,8 @@ public class Deal {
     private Long id;
 
     private String title;
+    @Size(max = 255, message = "Description must be 255 characters or less")
+    @Column(columnDefinition = "TEXT")
     private String description;
     private String tag;
     private Double originalPrice;

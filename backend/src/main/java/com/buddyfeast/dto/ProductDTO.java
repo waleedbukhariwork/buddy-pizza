@@ -1,5 +1,6 @@
 package com.buddyfeast.dto;
 
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 @Getter
@@ -10,6 +11,7 @@ import lombok.*;
 public class ProductDTO {
     private Long id;
     private String name;
+    @Size(max = 255, message = "Description must be 255 characters or less")
     private String description;
     private Double price;
     private Long categoryId;
