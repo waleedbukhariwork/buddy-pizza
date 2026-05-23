@@ -217,7 +217,7 @@ public class EmailService {
                "<p style=\"margin:0 0 12px;font-size:18px;font-weight:800;color:#231f20\">" + safeOrderNumber + "</p>" +
                "<ul style=\"margin:0 0 16px;padding-left:18px;font-size:14px;line-height:1.5\">" + itemsHtml + "</ul>" +
                "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-top:1px solid #f0dfc8;padding-top:12px\">" +
-               "<tr><td style=\"font-size:13px;color:#7c746d\">Order total</td>" +
+               "<tr><td style=\"font-size:13px;color:#7c746d\">Order total: </td>" +
                "<td align=\"right\" style=\"font-size:16px;font-weight:800;color:#231f20\">" + formattedTotal + "</td></tr>" +
                "</table></td></tr></table>" +
 
