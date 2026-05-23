@@ -21,10 +21,18 @@ services:
     plan: free
     branch: main
     envVars:
-      - key: DB_URL
+      - key: DB_HOST
         fromDatabase:
           name: buddy-feast-db
-          property: connectionString
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: buddy-feast-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: buddy-feast-db
+          property: database
       - key: DB_USERNAME
         fromDatabase:
           name: buddy-feast-db
