@@ -146,11 +146,14 @@ function MenuExperience() {
 		return () => window.removeEventListener('scroll', onScroll)
 	}, [])
 
-	// Scroll active category tab into view
+	// Scroll active category tab into view (horizontal only — avoid scrollIntoView which also scrolls the page)
 	useEffect(() => {
-		if (!tabsScrollRef.current) return
-		const activeBtn = tabsScrollRef.current.querySelector('[data-active="true"]') as HTMLElement | null
-		activeBtn?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' })
+		const container = tabsScrollRef.current
+		if (!container) return
+		const activeBtn = container.querySelector('[data-active="true"]') as HTMLElement | null
+		if (!activeBtn) return
+		const targetLeft = activeBtn.offsetLeft - (container.clientWidth - activeBtn.offsetWidth) / 2
+		container.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' })
 	}, [activeId])
 
 	const updateScrollArrows = useCallback(() => {

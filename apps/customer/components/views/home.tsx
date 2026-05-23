@@ -42,6 +42,82 @@ function TimeBar() {
 	)
 }
 
+const TICKER_MSG = '🔥 Fresh from the kitchen  ·  ⚡ 30-min delivery  ·  🍕 40+ menu items  ·  ⭐ Rated 4.9 by 1,200+ customers  ·  🛵 Free delivery above Rs 500  ·  🎁 Family deals from Rs 800  ·  🏆 No middleman. No cold food.  ·  '
+
+function Ticker() {
+	return (
+		<div className='bf-ticker' aria-hidden='true'>
+			<div className='bf-ticker-track'>
+				<span>{TICKER_MSG}</span>
+				<span>{TICKER_MSG}</span>
+			</div>
+		</div>
+	)
+}
+
+function useReveal() {
+	const ref = useRef<HTMLElement>(null)
+	useEffect(() => {
+		const el = ref.current
+		if (!el) return
+		const io = new IntersectionObserver(
+			([entry]) => { if (entry.isIntersecting) { el.classList.add('bf-in'); io.disconnect() } },
+			{ threshold: 0.08 },
+		)
+		io.observe(el)
+		return () => io.disconnect()
+	}, [])
+	return ref
+}
+
+function StatStrip({ etaMinutes }: { etaMinutes: number }) {
+	const ref = useReveal()
+	return (
+		<div className='bf-stat-strip-wrap'>
+			<div ref={ref as React.RefObject<HTMLDivElement>} className='bf-reveal bf-stat-strip'>
+				<div className='bf-stat-item'>
+					<div className='bf-stat-val'><span className='bf-stat-accent'>~{etaMinutes}</span></div>
+					<div className='bf-stat-lbl'>Min delivery</div>
+				</div>
+				<div className='bf-stat-item'>
+					<div className='bf-stat-val'>4.9<span className='bf-stat-accent'>★</span></div>
+					<div className='bf-stat-lbl'>Customer rating</div>
+				</div>
+				<div className='bf-stat-item'>
+					<div className='bf-stat-val'>40<span className='bf-stat-accent'>+</span></div>
+					<div className='bf-stat-lbl'>Menu items</div>
+				</div>
+				<div className='bf-stat-item'>
+					<div className='bf-stat-val'>Rs<span className='bf-stat-accent'> 0</span></div>
+					<div className='bf-stat-lbl'>Free delivery</div>
+				</div>
+			</div>
+		</div>
+	)
+}
+
+function HomeCta() {
+	const ref = useReveal()
+	return (
+		<div className='bf-home-cta-wrap'>
+			<div ref={ref as React.RefObject<HTMLDivElement>} className='bf-reveal bf-home-cta'>
+				<span className='bf-home-cta-eyebrow'>Still deciding?</span>
+				<h2 className='bf-display bf-home-cta-title'>
+					Your next favourite<br />meal is one tap away.
+				</h2>
+				<div className='bf-home-cta-actions'>
+					<Link className='bf-btn bf-btn-lg bf-home-cta-btn-primary' href='/menu'>
+						Order now {Icons.arrow}
+					</Link>
+					<Link className='bf-btn bf-btn-lg bf-home-cta-btn-ghost' href='/deals'>
+						See deals
+					</Link>
+				</div>
+			</div>
+		</div>
+	)
+}
+
 function Skel({ h, style }: { h: number; style?: React.CSSProperties }) {
 	return <div className='bf-skeleton' style={{ height: h, ...style }} />
 }
@@ -52,6 +128,9 @@ function HomeExperience() {
 	const [canScrollLeft, setCanScrollLeft] = useState(false)
 	const [canScrollRight, setCanScrollRight] = useState(false)
 	const catScrollRef = useRef<HTMLDivElement>(null)
+	const catRevealRef = useReveal()
+	const dealsRevealRef = useReveal()
+	const favsRevealRef = useReveal()
 
 	const { data: products, isLoading: productsLoading } = useProducts()
 	const { data: categories, isLoading: catsLoading } = useCategories()
@@ -89,23 +168,26 @@ function HomeExperience() {
 	return (
 		<CustomerShell activePage='home'>
 			<TimeBar />
+			<Ticker />
 			<main>
+				{/* ── Hero ── */}
 				<section className='bf-hero'>
+					<div className='bf-hero-glow' />
 					<div className='bf-hero-grid'>
 						<div className='bf-hero-content'>
-							<span className='bf-pill bf-pill-amber' style={{ marginBottom: 14, alignSelf: 'flex-start' }}>
+							<span className='bf-pill bf-pill-amber bf-hero-a1' style={{ marginBottom: 14, alignSelf: 'flex-start' }}>
 								<svg width='8' height='8' viewBox='0 0 8 8' className='bf-pulse'><circle cx='4' cy='4' r='3.5' fill='currentColor' /></svg>
 								OPEN · DELIVERING NOW
 							</span>
-							<h1 className='bf-display bf-hero-title'>
+							<h1 className='bf-display bf-hero-title bf-hero-a2'>
 								Hot pizza.
 								<br />
 								<span className='bf-hero-title-accent'>At your door.</span>
 							</h1>
-							<p className='bf-hero-sub'>
+							<p className='bf-hero-sub bf-hero-a3'>
 								Pizza, burgers, shawarma, wings and more — straight from our kitchen. No middleman. No cold food.
 							</p>
-							<div className='bf-hero-delivery-line'>
+							<div className='bf-hero-delivery-line bf-hero-a3'>
 								<span>Delivering to <strong>{area}</strong></span>
 								<span>·</span>
 								{arrivalTime && <span className='bf-mono'>~{arrivalTime}</span>}
@@ -113,17 +195,17 @@ function HomeExperience() {
 								<span>Free above Rs 500</span>
 							</div>
 
-							<div className='bf-hero-search' role='button' tabIndex={0} onClick={openSearch} onKeyDown={(e) => { if (e.key === 'Enter') openSearch() }}>
+							<div className='bf-hero-search bf-hero-a4' role='button' tabIndex={0} onClick={openSearch} onKeyDown={(e) => { if (e.key === 'Enter') openSearch() }}>
 								<span style={{ color: 'var(--bf-mute)', display: 'flex' }}>{Icons.search}</span>
 								<input readOnly placeholder='Search pizza, burgers, deals…' aria-label='Search menu' />
 								<span className='bf-btn bf-btn-primary bf-btn-md' style={{ pointerEvents: 'none' }}>Search</span>
 							</div>
 
-							<div className='bf-hero-ctas'>
+							<div className='bf-hero-ctas bf-hero-a5'>
 								<Link className='bf-btn bf-btn-primary bf-btn-lg' href='/menu'>Order now {Icons.arrow}</Link>
 								<Link className='bf-btn bf-btn-outline bf-btn-lg' href='/deals'>See deals</Link>
 							</div>
-							<div className='bf-hero-trust'>
+							<div className='bf-hero-trust bf-hero-a6'>
 								<TrustStat k={`${etaMinutes} min`} v='Average delivery' />
 								<TrustStat k='4.9★' v='Customer rated' />
 								<TrustStat k='Rs. 0' v='Free delivery' />
@@ -133,6 +215,21 @@ function HomeExperience() {
 						<div className='bf-hero-visual'>
 							<div className='bf-img bf-img-ember bf-float bf-hero-img-frame'>
 								<span className='bf-img-cap'>hero · pepperoni pie, top-down</span>
+							</div>
+							{/* Floating info chips */}
+							<div className='bf-hero-chip bf-hero-chip-tl'>
+								<div className='bf-hero-chip-icon'>⭐</div>
+								<div>
+									<div className='bf-hero-chip-label'>4.9 Rating</div>
+									<div className='bf-hero-chip-sub'>1,200+ reviews</div>
+								</div>
+							</div>
+							<div className='bf-hero-chip bf-hero-chip-bl'>
+								<div className='bf-hero-chip-icon'>🛵</div>
+								<div>
+									<div className='bf-hero-chip-label'>~{etaMinutes} min</div>
+									<div className='bf-hero-chip-sub'>Avg. delivery</div>
+								</div>
 							</div>
 							{activeDeals[0] && (
 								<div className='bf-hero-deal-float'>
@@ -151,8 +248,13 @@ function HomeExperience() {
 				</section>
 
 				<ReorderCard />
+				<StatStrip etaMinutes={etaMinutes} />
 
-				<section className='bf-page-section'>
+				{/* ── Categories ── */}
+				<section
+					ref={catRevealRef as React.RefObject<HTMLElement>}
+					className='bf-page-section bf-reveal'
+				>
 					<SectionRow title='Browse the menu' link='/menu' />
 					{catsLoading ? (
 						<div style={{ display: 'flex', gap: 10 }}>
@@ -191,8 +293,13 @@ function HomeExperience() {
 					)}
 				</section>
 
+				{/* ── Deals ── */}
 				{(dealsLoading || activeDeals.length > 0) && (
-					<section id='deals' className='bf-page-section'>
+					<section
+						ref={dealsRevealRef as React.RefObject<HTMLElement>}
+						id='deals'
+						className='bf-page-section bf-reveal'
+					>
 						<SectionRow title="Today's deals" link='/deals' eyebrow='LIMITED' />
 						<div className='bf-deals-grid-home'>
 							{dealsLoading
@@ -202,7 +309,12 @@ function HomeExperience() {
 					</section>
 				)}
 
-				<section className='bf-page-section' style={{ paddingBottom: 56 }}>
+				{/* ── Fan Favourites ── */}
+				<section
+					ref={favsRevealRef as React.RefObject<HTMLElement>}
+					className='bf-page-section bf-reveal'
+					style={{ paddingBottom: 56 }}
+				>
 					<SectionRow title='Fan Favourites' link='/menu' />
 					{productsLoading ? (
 						<div className='bf-favourites-grid'>
@@ -224,6 +336,8 @@ function HomeExperience() {
 						</div>
 					)}
 				</section>
+
+				<HomeCta />
 			</main>
 		</CustomerShell>
 	)

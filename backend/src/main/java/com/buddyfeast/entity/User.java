@@ -1,5 +1,6 @@
 package com.buddyfeast.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ public class User {
     private String name;
     private String phone;
     private String email;
+    @JsonIgnore
     private String password;
     private String address;
     private String city;
