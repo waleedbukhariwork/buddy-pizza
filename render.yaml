@@ -14,7 +14,7 @@ services:
   - type: web
     name: buddy-feast-api
     runtime: docker
-    repo: https://github.com/YOUR_ORG/buddy-feast-monorepo
+    repo: https://github.com/waleedbukhariwork/buddy-pizza
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     region: singapore
@@ -56,7 +56,7 @@ services:
   - type: web
     name: buddy-feast-customer
     runtime: docker
-    repo: https://github.com/YOUR_ORG/buddy-feast-monorepo
+    repo: https://github.com/waleedbukhariwork/buddy-pizza
     dockerfilePath: ./apps/customer/Dockerfile
     dockerContext: .
     region: singapore
@@ -73,7 +73,7 @@ services:
   - type: web
     name: buddy-feast-admin
     runtime: docker
-    repo: https://github.com/YOUR_ORG/buddy-feast-monorepo
+    repo: https://github.com/waleedbukhariwork/buddy-pizza
     dockerfilePath: ./apps/admin/Dockerfile
     dockerContext: .
     region: singapore
@@ -90,7 +90,7 @@ services:
   - type: web
     name: buddy-feast-rider
     runtime: docker
-    repo: https://github.com/YOUR_ORG/buddy-feast-monorepo
+    repo: https://github.com/waleedbukhariwork/buddy-pizza
     dockerfilePath: ./apps/rider/Dockerfile
     dockerContext: .
     region: singapore
