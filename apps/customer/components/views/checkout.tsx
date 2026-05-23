@@ -31,10 +31,11 @@ function SectionHeader({ n, title }: { n: string; title: string }) {
 // ─── Form validation ──────────────────────────────────────────────────────────
 function validateFields(phone: string, house: string, area: string) {
 	const errs: Record<string, string> = {}
-	if (!phone.trim()) {
+	const clean = phone.replace(/[\s\-()]/g, '')
+	if (!clean) {
 		errs.phone = 'Phone number is required'
-	} else if (!/^[\d\s+()\-]{10,16}$/.test(phone.trim())) {
-		errs.phone = 'Enter a valid phone number'
+	} else if (!/^(?:\+92\d{10}|03\d{9})$/.test(clean)) {
+		errs.phone = 'Enter a valid Pakistani phone number (e.g. 03112345678)'
 	}
 	if (!house.trim()) errs.house = 'House / flat # is required'
 	if (!area.trim()) errs.area = 'Area is required'
@@ -364,7 +365,7 @@ function CheckoutExperience() {
 									value={phone}
 									onChange={e => { setPhone(e.target.value); clearFieldError('phone') }}
 									onBlur={() => handleBlur('phone')}
-									placeholder='+92 300 0000000'
+									placeholder='03112345678'
 								/>
 								<FieldErr field='phone' />
 							</div>
