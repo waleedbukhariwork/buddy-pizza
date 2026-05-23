@@ -810,7 +810,7 @@ function AuthSignIn() {
 			const { data } = await apiClient.post<AuthResponse>(
 				'/v1/auth/customer/login',
 				{
-					phoneOrEmail: email.trim(),
+					phoneOrEmail: email.trim().toLowerCase(),
 					password,
 				},
 			)
@@ -1180,7 +1180,7 @@ function AuthSignUp() {
 				'/v1/auth/customer/register',
 				{
 					name: name.trim(),
-					identifier: identifier.trim().replace(/[\s\-]/g, ''),
+					identifier: identifier.trim().replace(/[\s\-]/g, '').toLowerCase(),
 					password,
 				},
 			)

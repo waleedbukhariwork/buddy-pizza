@@ -20,7 +20,7 @@ export default function AdminLoginPage() {
 			const { data } = await apiClient.post<{
 				token: string
 				message: string
-			}>('/v1/auth/admin/login', { phoneOrEmail: email, password })
+			}>('/v1/auth/admin/login', { phoneOrEmail: email.trim().toLowerCase(), password })
 			setToken(data.token)
 			router.push('/')
 		} catch {
