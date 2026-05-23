@@ -5,6 +5,7 @@ import { Icons } from '../ui/icon'
 import { Logo } from '../ui/logo'
 import { CartTotals } from '../ui/cart-totals'
 import { CartItemRow } from '../cart/cart-drawer'
+import { ReceiptModal } from '../ui/receipt'
 import type { CartItem } from '@shared/index'
 import type { PlacedOrder } from '../../lib/hooks'
 
@@ -176,6 +177,7 @@ function ConfirmationExperience() {
 		order: PlacedOrder
 		cartSnapshot: CartItem[]
 	} | null>(null)
+	const [showReceipt, setShowReceipt] = useState(false)
 
 	useEffect(() => {
 		try {
@@ -308,8 +310,18 @@ function ConfirmationExperience() {
 				<div className='bf-fade-up-3' style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'center' }}>
 					<button className='bf-btn bf-btn-ink bf-btn-md'>Track live</button>
 					<Link href='/menu' className='bf-btn bf-btn-outline bf-btn-md'>Order again</Link>
-					<button className='bf-btn bf-btn-ghost bf-btn-md'>Receipt</button>
+					<button className='bf-btn bf-btn-ghost bf-btn-md' onClick={() => setShowReceipt(true)}>
+						{Icons.receipt} Receipt
+					</button>
 				</div>
+
+				{showReceipt && order && (
+					<ReceiptModal
+						order={order}
+						cartItems={cartItems}
+						onClose={() => setShowReceipt(false)}
+					/>
+				)}
 			</div>
 		</div>
 	)

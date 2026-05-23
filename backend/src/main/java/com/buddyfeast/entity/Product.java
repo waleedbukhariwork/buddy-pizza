@@ -43,7 +43,9 @@ public class Product {
     private Boolean isAvailable = true;
     private Boolean isHot = false;
     private Boolean hasSizes = false;
-    
+
+    private Boolean deleted = false;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     

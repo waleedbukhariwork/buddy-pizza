@@ -129,28 +129,28 @@ function DealsExperience() {
 						)}
 					</div>
 
-					<SearchField
-						inputRef={search.inputRef}
-						searchWrapRef={search.searchWrapRef}
-						inputVal={search.inputVal}
-						onInputChange={(v) => { search.setInputVal(v); search.setActiveIdx(-1) }}
-						onFocus={() => {}}
-						onKeyDown={search.handleKeyDown}
-						onClear={search.clearSearch}
-						placeholder='Search deals…'
-						isActive={isSearchMode}
-						showDropdown={search.showDropdown}
-						setShowDropdown={search.setShowDropdown}
-						dropdownItems={search.dropdownItems}
-						sectionLabel={search.sectionLabel}
-						suggestLoading={search.suggestLoading}
-						emptyMessage={search.emptyMessage}
-						activeIdx={search.activeIdx}
-						onSelect={search.commitSearch}
-						onHover={search.setActiveIdx}
-						onClearRecents={search.clearRecent}
-						showClearRecents={!search.inputVal.trim() && search.recentSearches.length > 0}
-					/>
+				<SearchField
+					inputRef={search.inputRef}
+					searchWrapRef={search.searchWrapRef}
+					inputVal={search.inputVal}
+					onInputChange={(v) => { search.setInputVal(v); search.setActiveIdx(-1) }}
+					onFocus={() => {}}
+					onKeyDown={search.handleKeyDown}
+					onClear={search.clearSearch}
+					placeholder='Search deals…'
+					isActive={isSearchMode}
+					showDropdown={search.showDropdown}
+					setShowDropdown={search.setShowDropdown}
+					dropdownItems={search.dropdownItems}
+					sectionLabel={search.sectionLabel}
+					suggestLoading={search.suggestLoading}
+					emptyMessage={search.emptyMessage}
+					activeIdx={search.activeIdx}
+					onSelect={search.commitSearch}
+					onHover={search.setActiveIdx}
+					onClearRecents={search.clearRecent}
+					showClearRecents={!search.inputVal.trim() && search.recentSearches.length > 0}
+				/>
 
 					{/* ── Deals grid ── */}
 					{isLoading ? (

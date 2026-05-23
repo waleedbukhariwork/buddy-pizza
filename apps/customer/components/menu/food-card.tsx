@@ -330,7 +330,11 @@ function FoodCard({
 				onClick={() => router.push(`/menu/${item.id}`)}
 			>
 				<div className='bf-food-card-compact-media'>
-					<FoodImg tone={tone} caption={item.name.toLowerCase()} style={{ height: '100%', borderRadius: 10 }} />
+					{item.imageUrl ? (
+						<img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10 }} />
+					) : (
+						<FoodImg tone={tone} caption={item.name.toLowerCase()} style={{ height: '100%', borderRadius: 10 }} />
+					)}
 					{item.isHot && (
 						<div className='bf-food-card-compact-hot'>
 							<HotBadge />
@@ -396,11 +400,15 @@ function FoodCard({
 					;(e.currentTarget as HTMLDivElement).style.transform = ''
 				}}
 			>
-				<FoodImg
-					tone={tone}
-					caption={item.name.toLowerCase()}
-					style={{ width: 90, height: 90, flexShrink: 0 }}
-				/>
+				{item.imageUrl ? (
+					<img src={item.imageUrl} alt={item.name} style={{ width: 90, height: 90, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }} />
+				) : (
+					<FoodImg
+						tone={tone}
+						caption={item.name.toLowerCase()}
+						style={{ width: 90, height: 90, flexShrink: 0 }}
+					/>
+				)}
 				<div style={{ flex: 1, minWidth: 0 }}>
 					<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
 						<div style={{ fontWeight: 800, fontSize: 16 }}>{item.name}</div>
@@ -472,11 +480,15 @@ function FoodCard({
 			style={{ padding: 12, cursor: 'pointer', position: 'relative', display: 'flex', flexDirection: 'column' }}
 			onClick={() => router.push(`/menu/${item.id}`)}
 		>
-			<FoodImg
-				tone={tone}
-				caption={item.name.toLowerCase()}
-				style={{ height: 130, flexShrink: 0 }}
-			/>
+			{item.imageUrl ? (
+				<img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: 130, objectFit: 'cover', borderRadius: 14, flexShrink: 0 }} />
+			) : (
+				<FoodImg
+					tone={tone}
+					caption={item.name.toLowerCase()}
+					style={{ height: 130, flexShrink: 0 }}
+				/>
+			)}
 
 			{/* Body — grows to fill card height so CTA always sits at the bottom */}
 			<div style={{ flex: 1, padding: '10px 4px 4px', display: 'flex', flexDirection: 'column' }}>

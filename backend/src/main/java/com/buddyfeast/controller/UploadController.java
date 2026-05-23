@@ -16,18 +16,12 @@ public class UploadController {
     @Autowired
     private UploadService uploadService;
 
-    /**
-     * POST /api/v1/assets/upload
-     * Accepts: multipart/form-data, field name = "file"
-     * Returns: { "url": "https://res.cloudinary.com/..." }
-     *
-     * Protected — requires ADMIN JWT (SecurityConfig: /v1/assets/** → ADMIN)
-     */
     @PostMapping("/upload")
     public ResponseEntity<Map<String, String>> uploadImage(
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "folder", required = false) String folder) {
         try {
-            String url = uploadService.uploadImage(file);
+            String url = uploadService.uploadImage(file, folder);
             return ResponseEntity.ok(Map.of("url", url));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest()
@@ -35,6 +29,18 @@ public class UploadController {
         } catch (IOException e) {
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Upload failed. Please try again."));
+        }
+    }
+
+    @DeleteMapping("/delete")
+    public ResponseEntity<Map<String, String>> deleteImage(
+            @RequestParam("url") String imageUrl) {
+        try {
+            uploadService.deleteImage(imageUrl);
+            return ResponseEntity.ok(Map.of("message", "Image deleted successfully"));
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to delete image. Please try again."));
         }
     }
 }

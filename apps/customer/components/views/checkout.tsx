@@ -82,6 +82,35 @@ function PlaceOrderBtn({ submitting, subtotal, itemCount, mobile }: { submitting
 	)
 }
 
+// ─── Loading overlay ──────────────────────────────────────────────────────────
+function LoadingOverlay() {
+	return (
+		<div style={{
+			position: 'fixed', inset: 0, zIndex: 9999,
+			background: 'rgba(35,31,32,.6)', backdropFilter: 'blur(6px)',
+			display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+			gap: 20,
+		}}>
+			<div style={{
+				width: 52, height: 52, borderRadius: 16,
+				background: 'var(--bf-ember)',
+				display: 'grid', placeItems: 'center',
+				boxShadow: '0 8px 24px rgba(232,67,31,.3)',
+			}}>
+				<span className='bf-spinner' style={{ width: 22, height: 22, borderWidth: 3 }} />
+			</div>
+			<div style={{ textAlign: 'center' }}>
+				<div style={{ fontWeight: 800, fontSize: 18, color: '#fff', marginBottom: 4, letterSpacing: '-.02em' }}>
+					Placing your order
+				</div>
+				<div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>
+					Sending to the kitchen
+				</div>
+			</div>
+		</div>
+	)
+}
+
 // ─── CHECKOUT ─────────────────────────────────────────────────────────────────
 function CheckoutExperience() {
 	const router = useRouter()
@@ -92,6 +121,7 @@ function CheckoutExperience() {
 	const subtotal = items.reduce((s, i) => s + (i.sizePrice ?? i.price) * i.quantity, 0)
 	const itemCount = items.reduce((s, i) => s + i.quantity, 0)
 
+	const submittingRef = useRef(false)
 	const [hydrated, setHydrated] = useState(false)
 	const [gpsLoading, setGpsLoading] = useState(false)
 	const [area, setArea] = useState('')
@@ -172,7 +202,8 @@ function CheckoutExperience() {
 	}
 
 	async function handlePlaceOrder() {
-		if (submitting) return
+		if (submittingRef.current) return
+
 		if (items.length === 0) {
 			setSubmitError('Your cart is empty. Add an item before placing an order.')
 			return
@@ -195,11 +226,11 @@ function CheckoutExperience() {
 		}
 
 		const orderItems = items.map((it) => {
-			const customizations = [it.size, it.customizations].filter(Boolean).join(', ') || undefined
+			const customizations = it.customizations?.trim() || undefined
 			if (it.dealId != null) {
 				return { dealId: it.dealId, itemName: it.productName, price: it.price, quantity: it.quantity, customizations }
 			}
-			return { productId: it.productId, quantity: it.quantity, customizations }
+			return { productId: it.productId, price: it.sizePrice ?? it.price, quantity: it.quantity, customizations }
 		})
 
 		if (orderItems.length === 0) {
@@ -207,13 +238,14 @@ function CheckoutExperience() {
 			return
 		}
 
+		submittingRef.current = true
 		setLockedCheckout({ subtotal, itemCount })
 		setSubmitting(true)
 		setSubmitError(null)
 		setValidationError(null)
 
 		try {
-			const addressParts = [fullName.trim(), house.trim(), area.trim(), landmark.trim()].filter(Boolean)
+			const addressParts = [house.trim(), area.trim(), landmark.trim()].filter(Boolean)
 			const deliveryAddress = addressParts.join(', ')
 
 			const order = await placeOrder({
@@ -232,6 +264,7 @@ function CheckoutExperience() {
 		} catch {
 			setSubmitError("We couldn't place your order. Please check your connection and try again.")
 			setSubmitting(false)
+			submittingRef.current = false
 			setLockedCheckout(null)
 		}
 	}
@@ -535,7 +568,12 @@ function CheckoutExperience() {
 							disabled={submitting || items.length === 0}
 							aria-busy={submitting}
 							className='bf-btn bf-btn-primary bf-btn-lg'
-							style={{ width: '100%', marginTop: 14, justifyContent: 'space-between' }}
+							style={{
+								width: '100%', marginTop: 14, justifyContent: 'space-between',
+								opacity: submitting ? 0.7 : 1,
+								cursor: submitting ? 'not-allowed' : 'pointer',
+								pointerEvents: submitting ? 'none' : 'auto',
+							}}
 						>
 							<PlaceOrderBtn submitting={submitting} subtotal={displaySubtotal} itemCount={displayItemCount} />
 						</button>
@@ -570,11 +608,18 @@ function CheckoutExperience() {
 					disabled={submitting || items.length === 0}
 					aria-busy={submitting}
 					className='bf-btn bf-btn-primary bf-btn-lg'
-					style={{ width: '100%', justifyContent: 'space-between' }}
+					style={{
+						width: '100%', justifyContent: 'space-between',
+						opacity: submitting ? 0.7 : 1,
+						cursor: submitting ? 'not-allowed' : 'pointer',
+						pointerEvents: submitting ? 'none' : 'auto',
+					}}
 				>
 					<PlaceOrderBtn submitting={submitting} subtotal={displaySubtotal} itemCount={displayItemCount} mobile />
 				</button>
 			</div>
+
+			{submitting && <LoadingOverlay />}
 		</div>
 	)
 }

@@ -6,7 +6,7 @@ import { CustomerShell } from '../layout/customer-shell'
 import { FoodImg, type Tone } from '../ui/food-img'
 import { DealCard } from '../home/home-primitives'
 import { Icons } from '../ui/icon'
-import { rs, useDeals, parseDealItems, getDealExpiryBadge } from '../../lib/hooks'
+import { rs, useDeals, parseDealItems, getDealExpiryBadge, type OptionGroup } from '../../lib/hooks'
 import { useCartStore } from '../../lib/cart-store'
 
 const TONES: Tone[] = ['ember', 'amber', 'ink']
@@ -53,24 +53,34 @@ function Skel({ h, w, style }: { h: number; w?: number | string; style?: React.C
 	return <div className='bf-skeleton' style={{ height: h, width: w, borderRadius: 12, ...style }} />
 }
 
-// ─── Flavor Picker Modal ──────────────────────────────────────────────────────
-function FlavorPickerModal({
-	flavorItems,
-	selectedFlavors,
+// ─── Options Picker Modal ─────────────────────────────────────────────────────
+function getItemGroups(item: ReturnType<typeof parseDealItems>[number]): OptionGroup[] {
+	if (item.options?.length) return item.options
+	if (item.availableFlavors?.length) return [{ label: 'Flavor', type: 'single', required: false, choices: item.availableFlavors }]
+	return []
+}
+
+function OptionsPickerModal({
+	optionItems,
+	selectedOptions,
 	onSelect,
 	onConfirm,
 	onClose,
 	dealPrice,
 	qty,
 }: {
-	flavorItems: ReturnType<typeof parseDealItems>
-	selectedFlavors: Record<string, string>
-	onSelect: (itemName: string, flavor: string) => void
+	optionItems: ReturnType<typeof parseDealItems>
+	selectedOptions: Record<string, string[]>
+	onSelect: (key: string, value: string, type: 'single' | 'multi') => void
 	onConfirm: () => void
 	onClose: () => void
 	dealPrice: number
 	qty: number
 }) {
+	const allRequiredMet = optionItems.every(item =>
+		getItemGroups(item).every(g => !g.required || (selectedOptions[`${item.name}__${g.label}`]?.length ?? 0) > 0)
+	)
+
 	return (
 		<div
 			style={{ position: 'fixed', inset: 0, background: 'rgba(35,31,32,.65)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center', zIndex: 100 }}
@@ -78,47 +88,71 @@ function FlavorPickerModal({
 		>
 			<div
 				className='bf-card'
-				style={{ padding: 0, maxWidth: 440, width: '92%', borderRadius: 22, overflow: 'hidden', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
+				style={{ padding: 0, maxWidth: 460, width: '92%', borderRadius: 22, overflow: 'hidden', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
 				onClick={e => e.stopPropagation()}
 			>
 				{/* Header */}
 				<div style={{ padding: '22px 24px 18px', borderBottom: '1px solid var(--bf-line)', flexShrink: 0 }}>
 					<div className='bf-eyebrow' style={{ marginBottom: 4 }}>CUSTOMIZE YOUR DEAL</div>
-					<h3 style={{ fontWeight: 800, fontSize: 20, margin: 0, letterSpacing: '-0.02em' }}>Choose your flavors</h3>
-					<p style={{ fontSize: 13, color: 'var(--bf-ink-2)', margin: '6px 0 0' }}>Select one flavor per item below</p>
+					<h3 style={{ fontWeight: 800, fontSize: 20, margin: 0, letterSpacing: '-0.02em' }}>Choose your options</h3>
+					<p style={{ fontSize: 13, color: 'var(--bf-ink-2)', margin: '6px 0 0' }}>Make your selections below before adding to cart</p>
 				</div>
 
 				{/* Items */}
-				<div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 22, overflowY: 'auto' }} className='bf-scroll'>
-					{flavorItems.map(item => (
-						<div key={item.name}>
-							<div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: 'var(--bf-ink)' }}>
-								{item.qty}× {item.name}
-								{item.size && <span style={{ fontWeight: 400, color: 'var(--bf-mute)' }}> · {item.size}</span>}
+				<div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 24, overflowY: 'auto' }} className='bf-scroll'>
+					{optionItems.map((item, idx) => {
+						const groups = getItemGroups(item)
+						return (
+							<div key={idx}>
+								<div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12, color: 'var(--bf-ink)' }}>
+									{item.qty}× {item.name}
+								</div>
+								<div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+									{groups.map(g => {
+										const key = `${item.name}__${g.label}`
+										const sel = selectedOptions[key] ?? []
+										return (
+											<div key={g.label}>
+												<div style={{ fontSize: 10.5, fontWeight: 800, color: g.required ? 'var(--bf-ember)' : 'var(--bf-mute)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+													{g.label}
+													{g.required
+														? <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--bf-ember)', background: 'rgba(232,67,31,.08)', padding: '1px 6px', borderRadius: 999 }}>required</span>
+														: <span style={{ fontSize: 9.5, fontWeight: 500, color: 'var(--bf-mute)', opacity: .7 }}>optional</span>
+													}
+												</div>
+												<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+													{g.choices.map(choice => {
+														const isSelected = sel.includes(choice)
+														return (
+															<button
+																key={choice}
+																className={`bf-btn bf-btn-sm ${isSelected ? 'bf-btn-primary' : 'bf-btn-outline'}`}
+																style={{ padding: '8px 16px', fontSize: 13, fontWeight: 600 }}
+																onClick={() => onSelect(key, choice, g.type)}
+															>
+																{choice}
+															</button>
+														)
+													})}
+												</div>
+											</div>
+										)
+									})}
+								</div>
 							</div>
-							<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-								{(item.availableFlavors ?? []).map(flavor => {
-									const isSelected = selectedFlavors[item.name] === flavor
-									return (
-										<button
-											key={flavor}
-											className={`bf-btn bf-btn-sm ${isSelected ? 'bf-btn-primary' : 'bf-btn-outline'}`}
-											style={{ padding: '8px 16px', fontSize: 13, fontWeight: 600 }}
-											onClick={() => onSelect(item.name, isSelected ? '' : flavor)}
-										>
-											{flavor}
-										</button>
-									)
-								})}
-							</div>
-						</div>
-					))}
+						)
+					})}
 				</div>
 
 				{/* Footer */}
 				<div style={{ padding: '16px 24px', borderTop: '1px solid var(--bf-line)', display: 'flex', gap: 10, flexShrink: 0 }}>
 					<button className='bf-btn bf-btn-outline bf-btn-md' style={{ flex: 1 }} onClick={onClose}>Cancel</button>
-					<button className='bf-btn bf-btn-primary bf-btn-md' style={{ flex: 2 }} onClick={onConfirm}>
+					<button
+						className='bf-btn bf-btn-primary bf-btn-md'
+						style={{ flex: 2, opacity: allRequiredMet ? 1 : 0.5 }}
+						disabled={!allRequiredMet}
+						onClick={onConfirm}
+					>
 						Add to cart · {rs(dealPrice * qty)}
 					</button>
 				</div>
@@ -137,8 +171,8 @@ function DealDetailPage({ dealId }: { dealId: number }) {
 
 	const deal = deals?.find((d) => d.id === dealId)
 	const parsedItems = parseDealItems(deal?.items)
-	const flavorItems = parsedItems.filter(i => (i.availableFlavors?.length ?? 0) > 0)
-	const needsFlavors = flavorItems.length > 0
+	const optionItems = parsedItems.filter(i => (i.options?.length ?? 0) > 0 || (i.availableFlavors?.length ?? 0) > 0)
+	const needsOptions = optionItems.length > 0
 
 	const savings =
 		deal?.originalPrice && deal?.discountPrice && deal.originalPrice > deal.discountPrice
@@ -150,9 +184,17 @@ function DealDetailPage({ dealId }: { dealId: number }) {
 
 	const [qty, setQty] = useState(1)
 	const [addState, setAddState] = useState<'idle' | 'added'>('idle')
-	const [showFlavorPicker, setShowFlavorPicker] = useState(false)
-	const [selectedFlavors, setSelectedFlavors] = useState<Record<string, string>>({})
+	const [showOptionsPicker, setShowOptionsPicker] = useState(false)
+	const [selectedOptions, setSelectedOptions] = useState<Record<string, string[]>>({})
 	const [showTerms, setShowTerms] = useState(false)
+
+	function handleOptionSelect(key: string, value: string, type: 'single' | 'multi') {
+		setSelectedOptions(prev => {
+			const current = prev[key] ?? []
+			if (type === 'single') return { ...prev, [key]: current.includes(value) ? [] : [value] }
+			return { ...prev, [key]: current.includes(value) ? current.filter(v => v !== value) : [...current, value] }
+		})
+	}
 
 	const tone: Tone = TONES[dealId % TONES.length]
 
@@ -164,9 +206,16 @@ function DealDetailPage({ dealId }: { dealId: number }) {
 	function buildCustomizations(): string {
 		return parsedItems.map(item => {
 			const parts = [`${item.qty}× ${item.name}`]
-			if (item.size) parts.push(item.size)
-			const flavor = selectedFlavors[item.name]
-			if (flavor) parts.push(flavor)
+			if (item.options?.length) {
+				for (const g of item.options) {
+					const sel = selectedOptions[`${item.name}__${g.label}`] ?? []
+					if (sel.length > 0) parts.push(`${g.label}: ${sel.join(', ')}`)
+				}
+			} else {
+				if (item.size) parts.push(item.size)
+				const flavorSel = selectedOptions[`${item.name}__Flavor`]?.[0]
+				if (flavorSel) parts.push(flavorSel)
+			}
 			return parts.join(' · ')
 		}).join(', ')
 	}
@@ -182,14 +231,14 @@ function DealDetailPage({ dealId }: { dealId: number }) {
 			customizations: buildCustomizations(),
 		})
 		setAddState('added')
-		setShowFlavorPicker(false)
+		setShowOptionsPicker(false)
 		setTimeout(() => setAddState('idle'), 2200)
 	}
 
 	function handleAdd() {
 		if (!deal) return
-		if (needsFlavors) {
-			setShowFlavorPicker(true)
+		if (needsOptions) {
+			setShowOptionsPicker(true)
 			return
 		}
 		addToCart()
@@ -354,7 +403,7 @@ function DealDetailPage({ dealId }: { dealId: number }) {
 									<div className='bf-eyebrow' style={{ marginBottom: 12, color: 'var(--bf-ink-2)' }}>WHAT&apos;S INCLUDED</div>
 									<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 										{parsedItems.map((item, i) => {
-											const hasFlavors = (item.availableFlavors?.length ?? 0) > 0
+											const groups = getItemGroups(item)
 											return (
 												<div key={i} style={{ padding: '11px 14px', background: 'var(--bf-paper)', borderRadius: 12, border: '1px solid var(--bf-line)' }}>
 													<div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -365,19 +414,24 @@ function DealDetailPage({ dealId }: { dealId: number }) {
 															<span style={{ fontSize: 14, fontWeight: 600, color: 'var(--bf-ink)' }}>
 																{item.qty}× {item.name}
 															</span>
-															{item.size && (
-																<span style={{ fontSize: 12, color: 'var(--bf-mute)', marginLeft: 6 }}>· {item.size}</span>
-															)}
 														</div>
 													</div>
-													{hasFlavors && (
-														<div style={{ marginTop: 6, paddingLeft: 34, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-															{(item.availableFlavors ?? []).map(f => (
-																<span key={f} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: 'rgba(232,67,31,.08)', color: 'var(--bf-ember)' }}>
-																	{f}
-																</span>
+													{groups.length > 0 && (
+														<div style={{ marginTop: 8, paddingLeft: 34, display: 'flex', flexDirection: 'column', gap: 6 }}>
+															{groups.map(g => (
+																<div key={g.label}>
+																	<div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--bf-mute)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
+																		{g.label} {g.type === 'single' ? '— choose one' : '— choose any'}
+																	</div>
+																	<div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+																		{g.choices.map(c => (
+																			<span key={c} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: 'rgba(232,67,31,.08)', color: 'var(--bf-ember)' }}>
+																				{c}
+																			</span>
+																		))}
+																	</div>
+																</div>
 															))}
-															<span style={{ fontSize: 11, color: 'var(--bf-mute)' }}>— choose one</span>
 														</div>
 													)}
 												</div>
@@ -462,8 +516,8 @@ function DealDetailPage({ dealId }: { dealId: number }) {
 										) : (
 											<>
 												<span>
-													{needsFlavors ? 'Choose flavors & add' : `Add to cart${qty > 1 ? ` · ${qty}×` : ''}`}
-													{!needsFlavors && ` · ${rs((deal.discountPrice ?? 0) * qty)}`}
+													{needsOptions ? 'Customize & add' : `Add to cart${qty > 1 ? ` · ${qty}×` : ''}`}
+													{!needsOptions && ` · ${rs((deal.discountPrice ?? 0) * qty)}`}
 												</span>
 												<span>{Icons.arrow}</span>
 											</>
@@ -546,19 +600,19 @@ function DealDetailPage({ dealId }: { dealId: number }) {
 						style={{ flex: 1, justifyContent: 'center', gap: 8, transition: 'background 0.2s' }}
 						onClick={handleAdd}
 					>
-						{isAdded ? <><CheckIcon /> Added!</> : needsFlavors ? <>Choose flavors {Icons.arrow}</> : <>Add to cart {Icons.arrow}</>}
+						{isAdded ? <><CheckIcon /> Added!</> : needsOptions ? <>Customize {Icons.arrow}</> : <>Add to cart {Icons.arrow}</>}
 					</button>
 				</div>
 			)}
 
-			{/* ── Flavor Picker Modal ── */}
-			{showFlavorPicker && (
-				<FlavorPickerModal
-					flavorItems={flavorItems}
-					selectedFlavors={selectedFlavors}
-					onSelect={(itemName, flavor) => setSelectedFlavors(prev => ({ ...prev, [itemName]: flavor }))}
+			{/* ── Options Picker Modal ── */}
+			{showOptionsPicker && (
+				<OptionsPickerModal
+					optionItems={optionItems}
+					selectedOptions={selectedOptions}
+					onSelect={handleOptionSelect}
 					onConfirm={addToCart}
-					onClose={() => setShowFlavorPicker(false)}
+					onClose={() => setShowOptionsPicker(false)}
 					dealPrice={deal.discountPrice ?? 0}
 					qty={qty}
 				/>

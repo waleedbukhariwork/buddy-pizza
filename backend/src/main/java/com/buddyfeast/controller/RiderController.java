@@ -3,6 +3,7 @@ package com.buddyfeast.controller;
 import com.buddyfeast.entity.Order;
 import com.buddyfeast.entity.Rider;
 import com.buddyfeast.repository.OrderRepository;
+import com.buddyfeast.service.OrderService;
 import com.buddyfeast.service.RiderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,9 @@ public class RiderController {
     
     @Autowired
     private OrderRepository orderRepository;
+
+    @Autowired
+    private OrderService orderService;
     
     @GetMapping("/{id}")
     public ResponseEntity<Rider> getRiderById(@PathVariable Long id) {
@@ -43,9 +47,6 @@ public class RiderController {
     public ResponseEntity<Order> updateOrderStatus(
         @PathVariable Long orderId,
         @RequestParam Order.OrderStatus status) {
-        return ResponseEntity.ok(orderRepository.findById(orderId).map(order -> {
-            order.setStatus(status);
-            return orderRepository.save(order);
-        }).orElseThrow());
+        return ResponseEntity.ok(orderService.updateOrderStatus(orderId, status));
     }
 }

@@ -28,6 +28,7 @@ public class Deal {
 
     private Boolean isActive = true;
     private Boolean isFeatured = false;
+    private Boolean deleted = false;
 
     // Image & content
     private String imageUrl;

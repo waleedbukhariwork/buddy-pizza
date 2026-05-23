@@ -4,6 +4,7 @@ import { AdminShell } from '../layout/admin-shell'
 import { AdminTopbar } from '../layout/admin-topbar'
 import { Icons } from '../ui/icon'
 import { FoodImg, type Tone } from '../ui/food-img'
+import { ImageUploader } from '../ui/image-uploader'
 import { Skeleton } from '../ui/skeleton'
 import {
 	useProducts,
@@ -395,7 +396,11 @@ function ProductPreview({ form }: { form: ProductForm }) {
 			<div className='bf-eyebrow' style={{ marginBottom: 14 }}>CUSTOMER PREVIEW</div>
 			<div className='bf-card' style={{ padding: 0, overflow: 'hidden' }}>
 				<div style={{ height: 3, background: form.isAvailable ? 'var(--bf-leaf)' : 'var(--bf-line)' }} />
-				<FoodImg tone='ember' style={{ width: '100%', height: 110, borderRadius: 0, border: 0 }} />
+				{form.imageUrl ? (
+					<img src={form.imageUrl} alt='' style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }} />
+				) : (
+					<FoodImg tone='ember' style={{ width: '100%', height: 110, borderRadius: 0, border: 0 }} />
+				)}
 				<div style={{ padding: '12px 14px 14px' }}>
 					{/* Badges */}
 					<div style={{ display: 'flex', gap: 5, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -760,9 +765,21 @@ function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryC
 
 						<hr className='bf-rule' />
 
-						{/* Section 3: Description */}
+						{/* Section 3: Image */}
 						<div>
-							<SectionLabel num={3} title='Description' />
+							<SectionLabel num={3} title='Product image' />
+							<ImageUploader
+								value={form.imageUrl ?? ''}
+								onChange={url => setForm(f => ({ ...f, imageUrl: url || null }))}
+								folder='buddy-feast/products'
+							/>
+						</div>
+
+						<hr className='bf-rule' />
+
+						{/* Section 4: Description */}
+						<div>
+							<SectionLabel num={4} title='Description' />
 							<textarea
 								className='bf-input'
 								rows={3}
@@ -1033,7 +1050,11 @@ export function AdminMenu() {
 											}}
 										>
 											<input type='checkbox' style={{ width: 15, height: 15, accentColor: 'var(--bf-ink)', cursor: 'pointer' }} />
-											<FoodImg tone={TONES[i % TONES.length]} style={{ width: 44, height: 44 }} />
+											{it.imageUrl ? (
+												<img src={it.imageUrl} alt='' style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover' }} />
+											) : (
+												<FoodImg tone={TONES[i % TONES.length]} style={{ width: 44, height: 44 }} />
+											)}
 											<div>
 												<div style={{ font: '700 14px var(--bf-font)' }}>{it.name}</div>
 												<div className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)', marginTop: 2, display: 'flex', gap: 6 }}>

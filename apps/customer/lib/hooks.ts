@@ -27,13 +27,22 @@ export interface Category {
 	isActive: boolean
 }
 
+export interface OptionGroup {
+	label: string
+	type: 'single' | 'multi'
+	required: boolean
+	choices: string[]
+}
+
 export interface DealItem {
 	productId?: number | null
 	name: string
 	qty: number
+	unitPrice: number
+	options?: OptionGroup[]
+	// Legacy fields kept for backward compat with old deal items
 	size?: string | null
 	availableFlavors?: string[]
-	unitPrice: number
 }
 
 export interface Deal {
@@ -84,7 +93,10 @@ export function getDealExpiryBadge(expiresAt: string | null | undefined): { text
 
 export interface OrderItem {
 	id: number
-	product: { id: number; name: string; price: number } | null
+	productId: number | null
+	dealId: number | null
+	productName: string | null
+	itemName: string | null
 	quantity: number
 	price: number
 }

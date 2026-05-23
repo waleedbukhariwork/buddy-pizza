@@ -24,7 +24,7 @@ public class ProductService {
     private CategoryRepository categoryRepository;
     
     public List<ProductDTO> getAllProducts() {
-        return productRepository.findAll()
+        return productRepository.findNotDeleted()
             .stream()
             .map(this::convertToDTO)
             .collect(Collectors.toList());
@@ -32,6 +32,7 @@ public class ProductService {
     
     public ProductDTO getProductById(Long id) {
         return productRepository.findById(id)
+            .filter(p -> !Boolean.TRUE.equals(p.getDeleted()))
             .map(this::convertToDTO)
             .orElseThrow(() -> new RuntimeException("Product not found"));
     }
@@ -100,7 +101,11 @@ public class ProductService {
     }
     
     public void deleteProduct(Long id) {
-        productRepository.deleteById(id);
+        Product product = productRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Product not found"));
+        if (Boolean.TRUE.equals(product.getDeleted())) return;
+        product.setDeleted(true);
+        productRepository.save(product);
     }
     
     private ProductDTO convertToDTO(Product product) {

@@ -225,11 +225,10 @@ function ShellInner({ children, activePage = 'home' }: { children: React.ReactNo
 	}, [count])
 
 	const [cartOpen, setCartOpen] = useState(false)
-	const headerRef = useRef<HTMLElement>(null)
-	const mobileHeaderRef = useRef<HTMLElement>(null)
-	const lastScrollY = useRef(0)
 	const router = useRouter()
 	const { user, hydrate, logout } = useAuthStore()
+
+	const [headerScrolled, setHeaderScrolled] = useState(false)
 
 	function handleLogout() {
 		logout()
@@ -240,22 +239,16 @@ function ShellInner({ children, activePage = 'home' }: { children: React.ReactNo
 
 	useEffect(() => {
 		function onScroll() {
-			const y = window.scrollY
-			const delta = y - lastScrollY.current
-			for (const el of [headerRef.current, mobileHeaderRef.current]) {
-				if (!el) continue
-				if (delta > 10 && y > 80) el.classList.add('bf-header-hidden')
-				else if (delta < -5) el.classList.remove('bf-header-hidden')
-			}
-			lastScrollY.current = y
+			setHeaderScrolled(window.scrollY > 20)
 		}
+		onScroll()
 		window.addEventListener('scroll', onScroll, { passive: true })
 		return () => window.removeEventListener('scroll', onScroll)
 	}, [])
 
 	return (
 		<div className='bf-shell-wrap' style={{ minHeight: '100vh', background: 'var(--bf-cream)', display: 'flex', flexDirection: 'column' }}>
-			<header ref={headerRef} className='bf-smart-header bf-header-desktop'>
+			<header className={`bf-smart-header bf-header-desktop${headerScrolled ? ' bf-header-scrolled' : ''}`}>
 				<Logo size={22} />
 				<nav className='bf-header-nav'>
 					<NavLink href='/' active={activePage === 'home'}>Home</NavLink>
@@ -284,7 +277,7 @@ function ShellInner({ children, activePage = 'home' }: { children: React.ReactNo
 				</div>
 			</header>
 
-			<header ref={mobileHeaderRef} className='bf-smart-header bf-header-mobile'>
+			<header className={`bf-smart-header bf-header-mobile${headerScrolled ? ' bf-header-scrolled' : ''}`}>
 				<Logo size={20} />
 				<div className='bf-header-mobile-center'>
 					<DeliveryChip compact />

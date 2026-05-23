@@ -2,7 +2,6 @@ package com.buddyfeast.controller;
 
 import com.buddyfeast.dto.PageResponse;
 import com.buddyfeast.dto.ProductDTO;
-import com.buddyfeast.entity.Product;
 import com.buddyfeast.service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

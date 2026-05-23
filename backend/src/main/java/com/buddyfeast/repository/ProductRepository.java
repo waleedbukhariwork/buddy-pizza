@@ -16,13 +16,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findByNameContainingIgnoreCase(String name);
     List<Product> findByIsAvailableTrue();
 
-    @Query("SELECT p FROM Product p WHERE p.isAvailable = true AND " +
+    @Query("SELECT p FROM Product p WHERE COALESCE(p.deleted, false) = false")
+    List<Product> findNotDeleted();
+
+    @Query("SELECT p FROM Product p WHERE p.isAvailable = true AND COALESCE(p.deleted, false) = false AND " +
            "(:q IS NULL OR :q = '' OR " +
            "LOWER(p.name) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
            "LOWER(p.description) LIKE LOWER(CONCAT('%', :q, '%')))")
     Page<Product> searchAvailable(@Param("q") String q, Pageable pageable);
 
-    @Query("SELECT p FROM Product p WHERE p.isAvailable = true AND p.category.id = :categoryId AND " +
+    @Query("SELECT p FROM Product p WHERE p.isAvailable = true AND COALESCE(p.deleted, false) = false AND p.category.id = :categoryId AND " +
            "(:q IS NULL OR :q = '' OR " +
            "LOWER(p.name) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
            "LOWER(p.description) LIKE LOWER(CONCAT('%', :q, '%')))")

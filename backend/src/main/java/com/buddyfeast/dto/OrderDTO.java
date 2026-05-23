@@ -24,7 +24,11 @@ public class OrderDTO {
     @AllArgsConstructor
     @Builder
     public static class OrderItemDTO {
+        private Long id;
+        private Long productId;
+        private Long dealId;
         private String productName;
+        private String itemName;
         private Integer quantity;
         private Double price;
     }

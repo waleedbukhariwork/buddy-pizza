@@ -86,8 +86,6 @@ function MenuExperience() {
 
 	const catStripRef = useRef<HTMLDivElement>(null)
 	const tabsScrollRef = useRef<HTMLDivElement>(null)
-	const lastScrollY = useRef(0)
-	const headerH = useRef(69)
 	const scrollingToRef = useRef<number | null>(null)
 
 	const { data: products, isLoading: productsLoading } = useProducts()
@@ -128,23 +126,8 @@ function MenuExperience() {
 		if (typeof window !== 'undefined' && window.innerWidth < 768) setView('list')
 	}, [])
 
-	// Sync category strip top with header hide/show
-	useEffect(() => {
-		const header = Array.from(document.querySelectorAll('.bf-smart-header'))
-			.find(el => (el as HTMLElement).offsetParent !== null) as HTMLElement | null
-		if (header) headerH.current = header.offsetHeight
-		function onScroll() {
-			const y = window.scrollY
-			const delta = y - lastScrollY.current
-			if (catStripRef.current) {
-				if (delta > 10 && y > 80) catStripRef.current.style.top = '0px'
-				else if (delta < -5) catStripRef.current.style.top = `${headerH.current}px`
-			}
-			lastScrollY.current = y
-		}
-		window.addEventListener('scroll', onScroll, { passive: true })
-		return () => window.removeEventListener('scroll', onScroll)
-	}, [])
+	// No hide-on-scroll needed — the header is fixed and the category strip
+	// is sticky below it via CSS (top: 69px / 57px).
 
 	// Scroll active category tab into view (horizontal only — avoid scrollIntoView which also scrolls the page)
 	useEffect(() => {

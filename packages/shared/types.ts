@@ -22,6 +22,7 @@ export interface Product {
 	description: string
 	price: number
 	category: string
+	imageUrl?: string | null
 	isAvailable: boolean
 	isHot: boolean
 	hasSizes: boolean

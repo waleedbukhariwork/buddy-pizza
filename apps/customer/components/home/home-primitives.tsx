@@ -17,7 +17,7 @@ function CheckIcon() {
 }
 
 // ─── Deal card ────────────────────────────────────────────────────────────────
-function DealCard({ d, tone = 'ember' }: { d: Deal; tone?: Tone }) {
+function DealCard({ d, tone = 'ember', featured = false }: { d: Deal; tone?: Tone; featured?: boolean }) {
 	const router = useRouter()
 	const addItem = useCartStore((s) => s.addItem)
 	const inCart = useCartStore((s) => s.items.some((i) => i.dealId === d.id))
@@ -59,13 +59,13 @@ function DealCard({ d, tone = 'ember' }: { d: Deal; tone?: Tone }) {
 				<img
 					src={d.imageUrl}
 					alt={d.title}
-					style={{ height: 130, width: '100%', objectFit: 'cover', flexShrink: 0 }}
+					style={{ height: featured ? 200 : 130, width: '100%', objectFit: 'cover', flexShrink: 0 }}
 				/>
 			) : (
 				<FoodImg
 					tone={tone}
 					caption={'deal · ' + d.title.toLowerCase()}
-					style={{ height: 130, borderRadius: 0, flexShrink: 0 }}
+					style={{ height: featured ? 200 : 130, borderRadius: 0, flexShrink: 0 }}
 				/>
 			)}
 

@@ -87,7 +87,6 @@ export function AdminDashboard() {
 						? 'Loading…'
 						: `${activeCount} ACTIVE · ${deliveredCount} DELIVERED TODAY`
 				}
-				cta='New order'
 			/>
 			<div className='bf-admin-page'>
 				{/* Metrics */}
@@ -288,7 +287,9 @@ export function AdminDashboard() {
 											<span style={{ color: 'var(--bf-ink-2)' }}>
 												{shortAddress(o.deliveryAddress)}
 											</span>
-											<span className='bf-mono'>{o.items?.length ?? 0} items</span>
+											<span className='bf-mono'>
+												{o.items?.length ?? 0} items
+											</span>
 											<StatusPill status={o.status} />
 											<span
 												className='bf-tabular'

@@ -31,6 +31,9 @@ public class OrderService {
     @Autowired
     private RiderRepository riderRepository;
 
+    @Autowired
+    private EmailService emailService;
+
     public OrderDTO createOrder(CreateOrderRequest request, Long userId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
@@ -72,12 +75,13 @@ public class OrderService {
             } else {
                 Product product = productRepository.findById(itemReq.getProductId())
                     .orElseThrow(() -> new RuntimeException("Product not found"));
+                double price = itemReq.getPrice() != null ? itemReq.getPrice() : product.getPrice();
                 return OrderItem.builder()
                     .order(order)
                     .product(product)
                     .itemName(product.getName())
                     .quantity(itemReq.getQuantity())
-                    .price(product.getPrice())
+                    .price(price)
                     .customizations(itemReq.getCustomizations())
                     .build();
             }
@@ -115,9 +119,16 @@ public class OrderService {
     public Order updateOrderStatus(Long orderId, Order.OrderStatus status) {
         Order order = orderRepository.findById(orderId)
             .orElseThrow(() -> new RuntimeException("Order not found"));
-        
+
+        Order.OrderStatus previousStatus = order.getStatus();
         order.setStatus(status);
-        return orderRepository.save(order);
+        Order savedOrder = orderRepository.save(order);
+
+        if (previousStatus != status) {
+            sendOrderStatusUpdateEmail(savedOrder, previousStatus, status);
+        }
+
+        return savedOrder;
     }
     
     public Order assignRider(Long orderId, Long riderId) {
@@ -126,19 +137,31 @@ public class OrderService {
 
         Rider rider = riderRepository.findById(riderId)
             .orElseThrow(() -> new RuntimeException("Rider not found"));
-        
+
+        Order.OrderStatus previousStatus = order.getStatus();
         order.setRider(rider);
         order.setStatus(Order.OrderStatus.WITH_RIDER);
-        return orderRepository.save(order);
+        Order savedOrder = orderRepository.save(order);
+
+        if (previousStatus != Order.OrderStatus.WITH_RIDER) {
+            sendOrderStatusUpdateEmail(savedOrder, previousStatus, Order.OrderStatus.WITH_RIDER);
+        }
+
+        return savedOrder;
     }
     
     private OrderDTO convertToDTO(Order order) {
         List<OrderDTO.OrderItemDTO> itemDTOs = order.getItems().stream()
             .map(item -> {
-                String name = item.getItemName() != null ? item.getItemName()
-                    : (item.getProduct() != null ? item.getProduct().getName() : "Item");
+                String productName = item.getProduct() != null ? item.getProduct().getName() : null;
+                String displayName = item.getItemName() != null ? item.getItemName()
+                    : (productName != null ? productName : "Item");
                 return OrderDTO.OrderItemDTO.builder()
-                    .productName(name)
+                    .id(item.getId())
+                    .productId(item.getProduct() != null ? item.getProduct().getId() : null)
+                    .dealId(item.getDealId())
+                    .productName(productName)
+                    .itemName(item.getItemName())
                     .quantity(item.getQuantity())
                     .price(item.getPrice())
                     .build();
@@ -154,5 +177,51 @@ public class OrderService {
             .deliveryAddress(order.getDeliveryAddress())
             .createdAt(order.getCreatedAt())
             .build();
+    }
+
+    private void sendOrderStatusUpdateEmail(Order order, Order.OrderStatus previousStatus, Order.OrderStatus status) {
+        User user = order.getUser();
+        if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+            return;
+        }
+
+        List<String> itemSummaries = order.getItems().stream()
+            .map(item -> {
+                String productName = item.getProduct() != null ? item.getProduct().getName() : null;
+                String displayName = item.getItemName() != null ? item.getItemName()
+                    : (productName != null ? productName : "Item");
+                return item.getQuantity() + " x " + displayName;
+            })
+            .collect(Collectors.toList());
+
+        try {
+            if (previousStatus == Order.OrderStatus.NEW && status == Order.OrderStatus.PREPARING) {
+                emailService.sendOrderAcceptedEmail(
+                    user.getEmail(),
+                    user.getName(),
+                    order.getOrderNumber(),
+                    itemSummaries,
+                    order.getTotal()
+                );
+            } else if (status == Order.OrderStatus.WITH_RIDER) {
+                emailService.sendOrderOnRideEmail(
+                    user.getEmail(),
+                    user.getName(),
+                    order.getOrderNumber(),
+                    itemSummaries,
+                    order.getTotal()
+                );
+            } else if (status == Order.OrderStatus.DELIVERED) {
+                emailService.sendOrderDeliveredEmail(
+                    user.getEmail(),
+                    user.getName(),
+                    order.getOrderNumber(),
+                    itemSummaries,
+                    order.getTotal()
+                );
+            }
+        } catch (RuntimeException ignored) {
+            // Email delivery should not block kitchen workflow updates.
+        }
     }
 }

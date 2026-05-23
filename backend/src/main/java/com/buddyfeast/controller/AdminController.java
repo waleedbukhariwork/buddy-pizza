@@ -9,7 +9,6 @@ import com.buddyfeast.entity.Order;
 import com.buddyfeast.entity.Product;
 import com.buddyfeast.repository.CategoryRepository;
 import com.buddyfeast.repository.OrderRepository;
-import com.buddyfeast.repository.ProductRepository;
 import com.buddyfeast.repository.RiderRepository;
 import com.buddyfeast.service.AdminService;
 import com.buddyfeast.service.DealService;
@@ -32,9 +31,6 @@ public class AdminController {
 
     @Autowired
     private ProductService productService;
-    
-    @Autowired
-    private ProductRepository productRepository;
     
     @Autowired
     private OrderRepository orderRepository;

@@ -20,7 +20,7 @@ public class DealService {
 
     public List<DealDTO> getAllDeals() {
         LocalDateTime now = LocalDateTime.now();
-        return dealRepository.findByIsActiveTrue()
+        return dealRepository.findActiveNotDeleted()
             .stream()
             .filter(d -> d.getStartsAt() == null || !now.isBefore(d.getStartsAt()))
             .filter(d -> d.getExpiresAt() == null || now.isBefore(d.getExpiresAt()))
@@ -31,7 +31,7 @@ public class DealService {
     }
 
     public List<DealDTO> getAllDealsAdmin() {
-        return dealRepository.findAll()
+        return dealRepository.findNotDeleted()
             .stream()
             .sorted(Comparator.comparingInt(d -> d.getDisplayOrder() == null ? 0 : d.getDisplayOrder()))
             .map(this::convertToDTO)
@@ -40,6 +40,7 @@ public class DealService {
 
     public DealDTO getDealById(Long id) {
         return dealRepository.findById(id)
+            .filter(d -> !Boolean.TRUE.equals(d.getDeleted()))
             .map(this::convertToDTO)
             .orElseThrow(() -> new RuntimeException("Deal not found"));
     }
@@ -91,7 +92,11 @@ public class DealService {
     }
 
     public void deleteDeal(Long id) {
-        dealRepository.deleteById(id);
+        Deal deal = dealRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Deal not found"));
+        if (Boolean.TRUE.equals(deal.getDeleted())) return;
+        deal.setDeleted(true);
+        dealRepository.save(deal);
     }
 
     private DealDTO convertToDTO(Deal deal) {

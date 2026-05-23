@@ -378,11 +378,15 @@ function ProductDetailPage({ productId }: { productId: number }) {
 					<div className='bf-pd-layout'>
 						{/* LEFT: sticky image panel */}
 						<div className='bf-pd-image-col bf-fade-up'>
-							<FoodImg
-								tone={tone}
-								caption={product.name.toLowerCase()}
-								className='bf-pd-hero-img'
-							/>
+							{product.imageUrl ? (
+								<img src={product.imageUrl} alt={product.name} className='bf-pd-hero-img' style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 22 }} />
+							) : (
+								<FoodImg
+									tone={tone}
+									caption={product.name.toLowerCase()}
+									className='bf-pd-hero-img'
+								/>
+							)}
 							<TrustStrip />
 						</div>
 

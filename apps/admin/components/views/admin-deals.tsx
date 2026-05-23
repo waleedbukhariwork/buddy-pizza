@@ -5,11 +5,40 @@ import { AdminTopbar } from '../layout/admin-topbar'
 import { Icons } from '../ui/icon'
 import { Skeleton } from '../ui/skeleton'
 import { useDeals, useProducts, saveDeal, deleteDeal } from '../../lib/hooks'
+import { ImageUploader } from '../ui/image-uploader'
 import type { Deal, Product } from '../../lib/types'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const FLAVOR_PRESETS = ['Peri Peri', 'BBQ', 'Tikka', 'Garlic', 'Original']
-const SIZE_LABELS = ['Small', 'Regular', 'Medium', 'Large', 'Family']
+// ─── Option group model ───────────────────────────────────────────────────────
+interface OptionGroup {
+	label: string
+	type: 'single' | 'multi'
+	required: boolean
+	choices: string[]
+}
+
+const LABEL_SUGGESTIONS: Record<string, string[]> = {
+	size:     ['Small', 'Medium', 'Large', 'Regular', 'Family', 'Personal'],
+	flavor:   ['Peri Peri', 'BBQ', 'Tikka', 'Garlic', 'Original', 'Cheese'],
+	serving:  ['Half', 'Full', 'Single', 'Combo'],
+	quantity: ['6 pcs', '10 pcs', '12 pcs', 'Family Pack'],
+	sauce:    ['Ketchup', 'Mayo', 'Ranch', 'Sriracha', 'BBQ'],
+	crust:    ['Thin', 'Regular', 'Thick', 'Stuffed'],
+}
+
+const QUICK_START_GROUPS: OptionGroup[] = [
+	{ label: 'Size',          type: 'single', required: true,  choices: ['Small', 'Medium', 'Large'] },
+	{ label: 'Flavor',        type: 'single', required: false, choices: ['Peri Peri', 'BBQ', 'Tikka'] },
+	{ label: 'Serving Style', type: 'single', required: true,  choices: ['Half', 'Full'] },
+	{ label: 'Quantity',      type: 'single', required: true,  choices: ['6 pcs', '10 pcs', '12 pcs'] },
+]
+
+function getSuggestions(label: string): string[] {
+	const lc = label.toLowerCase()
+	for (const [key, suggestions] of Object.entries(LABEL_SUGGESTIONS)) {
+		if (lc.includes(key)) return suggestions
+	}
+	return []
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SelectedItem {
@@ -17,9 +46,7 @@ interface SelectedItem {
 	name: string
 	unitPrice: number
 	qty: number
-	size?: string | null
-	availableFlavors?: string[]
-	hasSizes?: boolean
+	options: OptionGroup[]
 }
 
 // ─── Serialization (JSON format, backward-compat parse) ───────────────────────
@@ -29,30 +56,29 @@ function serializeItems(items: SelectedItem[]): string {
 			productId: i.productId ?? null,
 			name: i.name.trim(),
 			qty: i.qty,
-			size: i.size ?? null,
-			availableFlavors: i.availableFlavors ?? [],
 			unitPrice: i.unitPrice,
+			options: i.options ?? [],
 		}))
 	)
 }
 
-function parseToSelected(raw: string | null | undefined, products: Product[]): SelectedItem[] {
+function parseToSelected(raw: string | null | undefined, _products: Product[]): SelectedItem[] {
 	if (!raw?.trim()) return []
 	if (raw.trim().startsWith('[')) {
 		try {
 			const parsed = JSON.parse(raw) as Array<{
-				productId?: number | null; name: string; qty: number
-				size?: string | null; availableFlavors?: string[]; unitPrice: number
+				productId?: number | null; name: string; qty: number; unitPrice: number
+				options?: OptionGroup[]; size?: string | null; availableFlavors?: string[]
 			}>
-			return parsed.map(item => ({
-				productId: item.productId ?? undefined,
-				name: item.name,
-				qty: item.qty,
-				size: item.size ?? undefined,
-				availableFlavors: item.availableFlavors ?? [],
-				unitPrice: item.unitPrice,
-				hasSizes: products.find(p => p.id === (item.productId ?? undefined))?.hasSizes ?? false,
-			}))
+			return parsed.map(item => {
+				let options: OptionGroup[] = item.options?.length ? item.options : []
+				// Migrate legacy size + availableFlavors to option groups
+				if (!options.length) {
+					if (item.size) options = [...options, { label: 'Size', type: 'single', required: true, choices: [item.size] }]
+					if (item.availableFlavors?.length) options = [...options, { label: 'Flavor', type: 'single', required: false, choices: item.availableFlavors }]
+				}
+				return { productId: item.productId ?? undefined, name: item.name, qty: item.qty, unitPrice: item.unitPrice, options }
+			})
 		} catch { /* fall through */ }
 	}
 	// Legacy \n format
@@ -60,15 +86,8 @@ function parseToSelected(raw: string | null | undefined, products: Product[]): S
 		const m = line.match(/^(\d+)×\s*(.+)$/)
 		const qty = m ? parseInt(m[1]) : 1
 		const name = m ? m[2] : line
-		const product = products.find(p => p.name.toLowerCase() === name.toLowerCase())
-		return {
-			productId: product?.id,
-			name,
-			unitPrice: product?.priceSmall ?? product?.price ?? 0,
-			qty,
-			availableFlavors: [],
-			hasSizes: product?.hasSizes ?? false,
-		}
+		const product = _products.find(p => p.name.toLowerCase() === name.toLowerCase())
+		return { productId: product?.id, name, unitPrice: product?.priceSmall ?? product?.price ?? 0, qty, options: [] }
 	})
 }
 
@@ -106,6 +125,9 @@ function getStartInfo(startsAt?: string | null): string | null {
 	if (hours < 24) return `Starts in ${hours}h`
 	return `Starts ${new Date(startsAt).toLocaleDateString('en-PK', { month: 'short', day: 'numeric' })}`
 }
+
+// ─── Image upload ─────────────────────────────────────────────────────────────
+// Now using shared ImageUploader from '../ui/image-uploader'
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
 function Toggle({ on, onChange, color = 'var(--bf-ember)' }: { on: boolean; onChange: () => void; color?: string }) {
@@ -163,14 +185,15 @@ function ProductPicker({ products, selected, onAdd }: {
 	}, [])
 
 	function handleSelect(p: Product) {
-		onAdd({
-			productId: p.id,
-			name: p.name,
-			unitPrice: p.priceSmall ?? p.price,
-			qty: 1,
-			availableFlavors: [],
-			hasSizes: p.hasSizes ?? false,
-		})
+		const options: OptionGroup[] = []
+		if (p.hasSizes) {
+			const choices: string[] = []
+			if (p.labelSmall || p.priceSmall) choices.push(p.labelSmall ?? 'Small')
+			if (p.labelMedium || p.priceMedium) choices.push(p.labelMedium ?? 'Medium')
+			if (p.labelLarge || p.priceLarge) choices.push(p.labelLarge ?? 'Large')
+			options.push({ label: 'Size', type: 'single', required: true, choices: choices.length ? choices : ['Small', 'Medium', 'Large'] })
+		}
+		onAdd({ productId: p.id, name: p.name, unitPrice: p.priceSmall ?? p.price, qty: 1, options })
 		setQuery('')
 		setOpen(false)
 	}
@@ -248,92 +271,144 @@ function ProductPicker({ products, selected, onAdd }: {
 	)
 }
 
-// ─── Item config panel (size + flavors) ───────────────────────────────────────
-function ItemConfigPanel({ item, onUpdate }: {
-	item: SelectedItem
-	onUpdate: (updates: Partial<SelectedItem>) => void
+// ─── Option group card ────────────────────────────────────────────────────────
+function OptionGroupCard({ group, onChange, onRemove }: {
+	group: OptionGroup
+	onChange: (updates: Partial<OptionGroup>) => void
+	onRemove: () => void
 }) {
-	const [flavorInput, setFlavorInput] = useState('')
+	const [choiceInput, setChoiceInput] = useState('')
+	const suggestions = getSuggestions(group.label).filter(s => !group.choices.includes(s))
 
-	function addCustomFlavor() {
-		const val = flavorInput.trim()
-		if (!val) return
-		const current = item.availableFlavors ?? []
-		if (!current.includes(val)) onUpdate({ availableFlavors: [...current, val] })
-		setFlavorInput('')
+	function addChoice(val: string) {
+		const v = val.trim()
+		if (!v || group.choices.includes(v)) return
+		onChange({ choices: [...group.choices, v] })
 	}
 
 	return (
-		<div style={{ padding: '14px 14px', borderTop: '1px solid var(--bf-line)', background: 'var(--bf-cream-2)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+		<div style={{ background: 'var(--bf-paper)', border: '1px solid var(--bf-line)', borderRadius: 14, overflow: 'hidden' }}>
+			{/* Header row */}
+			<div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid var(--bf-line)' }}>
+				<input
+					className='bf-input'
+					value={group.label}
+					onChange={e => onChange({ label: e.target.value })}
+					placeholder='e.g. Size, Flavor, Serving Style…'
+					style={{ flex: 1, height: 32, fontSize: 12.5, fontWeight: 600 }}
+				/>
+				{/* Single / Multi toggle */}
+				<div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--bf-line)', flexShrink: 0 }}>
+					{(['single', 'multi'] as const).map(t => (
+						<button key={t} onClick={() => onChange({ type: t })} style={{
+							padding: '5px 9px', border: 'none', cursor: 'pointer', fontSize: 10.5, fontWeight: 700,
+							background: group.type === t ? 'var(--bf-ember)' : 'transparent',
+							color: group.type === t ? '#fff' : 'var(--bf-mute)',
+							transition: 'all .12s',
+						}}>{t === 'single' ? 'Single' : 'Multi'}</button>
+					))}
+				</div>
+				{/* Required toggle */}
+				<label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', flexShrink: 0 }}>
+					<Toggle on={group.required} onChange={() => onChange({ required: !group.required })} color='var(--bf-ember)' />
+					<span style={{ fontSize: 10.5, color: 'var(--bf-mute)', fontWeight: 600, whiteSpace: 'nowrap' }}>Req.</span>
+				</label>
+				<button onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--bf-mute)', padding: 2, display: 'flex', lineHeight: 1, flexShrink: 0 }} title='Remove group'>
+					{Icons.x}
+				</button>
+			</div>
 
-			{/* Size selector (only if product hasSizes) */}
-			{item.hasSizes && (
-				<div>
-					<div style={{ fontSize: 10, fontWeight: 800, color: 'var(--bf-mute)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>
-						Size for this deal
-					</div>
-					<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-						{SIZE_LABELS.map(sz => (
-							<button
-								key={sz}
-								className={`bf-btn bf-btn-sm ${item.size === sz ? 'bf-btn-primary' : 'bf-btn-outline'}`}
-								style={{ padding: '5px 12px', fontSize: 12 }}
-								onClick={() => onUpdate({ size: item.size === sz ? null : sz })}
-							>{sz}</button>
-						))}
-					</div>
-				</div>
-			)}
-
-			{/* Flavor availability */}
-			<div>
-				<div style={{ fontSize: 10, fontWeight: 800, color: 'var(--bf-mute)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 4 }}>
-					Available flavors
-				</div>
-				<div style={{ fontSize: 11, color: 'var(--bf-mute)', marginBottom: 8 }}>
-					Customers pick one when ordering this deal
-				</div>
-				<div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
-					{FLAVOR_PRESETS.map(f => {
-						const isOn = item.availableFlavors?.includes(f) ?? false
-						return (
-							<button
-								key={f}
-								className={`bf-btn bf-btn-sm ${isOn ? 'bf-btn-primary' : 'bf-btn-outline'}`}
-								style={{ padding: '5px 10px', fontSize: 11.5 }}
-								onClick={() => {
-									const current = item.availableFlavors ?? []
-									onUpdate({ availableFlavors: isOn ? current.filter(x => x !== f) : [...current, f] })
-								}}
-							>{f}</button>
-						)
-					})}
-				</div>
-				<div style={{ display: 'flex', gap: 6 }}>
-					<input
-						className='bf-input'
-						style={{ flex: 1, height: 34, fontSize: 12 }}
-						value={flavorInput}
-						onChange={e => setFlavorInput(e.target.value)}
-						placeholder='Custom flavor…'
-						onKeyDown={e => { if (e.key === 'Enter') addCustomFlavor() }}
-					/>
-					<button className='bf-btn bf-btn-outline bf-btn-sm' style={{ height: 34 }} onClick={addCustomFlavor}>Add</button>
-				</div>
-				{(item.availableFlavors ?? []).filter(f => !FLAVOR_PRESETS.includes(f)).length > 0 && (
-					<div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
-						{(item.availableFlavors ?? []).filter(f => !FLAVOR_PRESETS.includes(f)).map(f => (
-							<span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', background: 'rgba(232,67,31,.1)', borderRadius: 999, fontSize: 11, fontWeight: 600, color: 'var(--bf-ember)' }}>
-								{f}
-								<button
-									style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit', lineHeight: 1, display: 'flex', fontSize: 14 }}
-									onClick={() => onUpdate({ availableFlavors: (item.availableFlavors ?? []).filter(x => x !== f) })}
-								>×</button>
+			{/* Choices + input */}
+			<div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+				{group.choices.length > 0 && (
+					<div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+						{group.choices.map(c => (
+							<span key={c} style={{
+								display: 'inline-flex', alignItems: 'center', gap: 3,
+								padding: '3px 8px 3px 10px', background: 'rgba(232,67,31,.08)',
+								border: '1px solid rgba(232,67,31,.2)', borderRadius: 999,
+								fontSize: 11.5, fontWeight: 600, color: 'var(--bf-ember)',
+							}}>
+								{c}
+								<button onClick={() => onChange({ choices: group.choices.filter(x => x !== c) })}
+									style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit', lineHeight: 1, display: 'flex', fontSize: 15, opacity: .7 }}>×</button>
 							</span>
 						))}
 					</div>
 				)}
+				{suggestions.length > 0 && (
+					<div>
+						<div style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--bf-mute)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 5 }}>Quick add</div>
+						<div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+							{suggestions.map(s => (
+								<button key={s} className='bf-btn bf-btn-outline bf-btn-sm' style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => addChoice(s)}>+ {s}</button>
+							))}
+						</div>
+					</div>
+				)}
+				<div style={{ display: 'flex', gap: 6 }}>
+					<input
+						className='bf-input'
+						style={{ flex: 1, height: 32, fontSize: 12 }}
+						value={choiceInput}
+						onChange={e => setChoiceInput(e.target.value)}
+						placeholder='Custom choice…'
+						onKeyDown={e => { if (e.key === 'Enter') { addChoice(choiceInput); setChoiceInput('') } }}
+					/>
+					<button className='bf-btn bf-btn-outline bf-btn-sm' style={{ height: 32, paddingInline: 10 }} onClick={() => { addChoice(choiceInput); setChoiceInput('') }}>Add</button>
+				</div>
 			</div>
+		</div>
+	)
+}
+
+// ─── Option groups editor ─────────────────────────────────────────────────────
+function OptionGroupsEditor({ options, onChange }: { options: OptionGroup[]; onChange: (opts: OptionGroup[]) => void }) {
+	const usedLabels = new Set(options.map(g => g.label.toLowerCase()))
+
+	function addGroup(preset?: OptionGroup) {
+		if (preset && usedLabels.has(preset.label.toLowerCase())) return
+		onChange([...options, preset ? { ...preset, choices: [...preset.choices] } : { label: '', type: 'single', required: false, choices: [] }])
+	}
+
+	return (
+		<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+			{options.map((g, i) => (
+				<OptionGroupCard
+					key={i}
+					group={g}
+					onChange={upd => onChange(options.map((x, j) => j === i ? { ...x, ...upd } : x))}
+					onRemove={() => onChange(options.filter((_, j) => j !== i))}
+				/>
+			))}
+			<button className='bf-btn bf-btn-outline bf-btn-sm' style={{ width: '100%', justifyContent: 'center', gap: 6 }} onClick={() => addGroup()}>
+				{Icons.plus} Add option group
+			</button>
+			{QUICK_START_GROUPS.some(q => !usedLabels.has(q.label.toLowerCase())) && (
+				<div>
+					<div style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--bf-mute)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>Quick start</div>
+					<div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+						{QUICK_START_GROUPS.filter(q => !usedLabels.has(q.label.toLowerCase())).map(q => (
+							<button key={q.label} className='bf-btn bf-btn-outline bf-btn-sm' style={{ padding: '3px 9px', fontSize: 11 }} onClick={() => addGroup(q)}>+ {q.label}</button>
+						))}
+					</div>
+				</div>
+			)}
+		</div>
+	)
+}
+
+// ─── Item config panel ────────────────────────────────────────────────────────
+function ItemConfigPanel({ item, onUpdate }: { item: SelectedItem; onUpdate: (updates: Partial<SelectedItem>) => void }) {
+	return (
+		<div style={{ padding: '14px 14px', borderTop: '1px solid var(--bf-line)', background: 'var(--bf-cream-2)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+			<div>
+				<div style={{ fontSize: 10, fontWeight: 800, color: 'var(--bf-mute)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 3 }}>Customer Options</div>
+				<div style={{ fontSize: 11, color: 'var(--bf-mute)', marginBottom: 10 }}>
+					Define what customers choose when ordering this item · Single = pick one, Multi = pick many
+				</div>
+			</div>
+			<OptionGroupsEditor options={item.options} onChange={opts => onUpdate({ options: opts })} />
 		</div>
 	)
 }
@@ -346,7 +421,7 @@ function SelectedItemsList({ items, onChange }: { items: SelectedItem[]; onChang
 		<div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
 			{items.map((item, i) => {
 				const isExpanded = expandedIndex === i
-				const hasFlavors = (item.availableFlavors?.length ?? 0) > 0
+				const hasOptions = item.options.length > 0
 				return (
 					<div key={i} style={{
 						background: 'var(--bf-paper)',
@@ -357,9 +432,9 @@ function SelectedItemsList({ items, onChange }: { items: SelectedItem[]; onChang
 							<div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--bf-ember)', flexShrink: 0 }} />
 							<div style={{ flex: 1, minWidth: 0 }}>
 								<div style={{ font: '600 13px var(--bf-font)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
-								{(item.size || hasFlavors) && (
+								{hasOptions && (
 									<div style={{ fontSize: 10.5, color: 'var(--bf-mute)', marginTop: 2 }}>
-										{[item.size, hasFlavors ? item.availableFlavors!.join(', ') : null].filter(Boolean).join(' · ')}
+										{item.options.map(g => `${g.label}${g.choices.length ? ` (${g.choices.length})` : ''}`).join(' · ')}
 									</div>
 								)}
 							</div>
@@ -420,8 +495,12 @@ function SelectedItemsList({ items, onChange }: { items: SelectedItem[]; onChang
 function DealPreview({ form, items }: { form: DealFormState; items: SelectedItem[] }) {
 	const itemLines = items.map(i => {
 		const parts = [`${i.qty}× ${i.name}`]
-		if (i.size) parts.push(i.size)
-		if (i.availableFlavors?.length) parts.push(i.availableFlavors.join(', '))
+		for (const g of i.options) {
+			if (g.choices.length > 0) {
+				const preview = g.choices.slice(0, 2).join(', ') + (g.choices.length > 2 ? '…' : '')
+				parts.push(`${g.label}: ${preview}`)
+			}
+		}
 		return parts.join(' · ')
 	})
 	const sav = getSavings(form.originalPrice ?? 0, form.discountPrice)
@@ -732,21 +811,11 @@ function DealModal({ deal, products, onClose, onSaved }: {
 						{/* ── DEAL IMAGE ── */}
 						<div>
 							<SectionHeader label='DEAL IMAGE' color='var(--bf-amber)' />
-							<div>
-								<label className='bf-label'>Image URL <span className='bf-opt'>(optional)</span></label>
-								<input
-									className='bf-input'
-									value={form.imageUrl}
-									onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))}
-									placeholder='https://your-cdn.com/deal-image.jpg'
-								/>
-								<div style={{ fontSize: 10.5, color: 'var(--bf-mute)', marginTop: 4 }}>Paste a direct image link — shown on the deal card</div>
-							</div>
-							{form.imageUrl && (
-								<div style={{ marginTop: 10, borderRadius: 12, overflow: 'hidden', height: 100, background: 'var(--bf-cream-2)' }}>
-									<img src={form.imageUrl} alt='Deal preview' style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }} />
-								</div>
-							)}
+							<ImageUploader
+								value={form.imageUrl}
+								onChange={url => setForm(f => ({ ...f, imageUrl: url }))}
+								folder='buddy-feast/deals'
+							/>
 						</div>
 
 						<hr className='bf-rule' />
@@ -982,11 +1051,17 @@ function DealCard({ deal, onEdit, onToggle, onDelete, onClone, toggling }: {
 		if (!raw?.trim()) return []
 		if (raw.trim().startsWith('[')) {
 			try {
-				const parsed = JSON.parse(raw) as Array<{ name: string; qty: number; size?: string | null; availableFlavors?: string[] }>
+				const parsed = JSON.parse(raw) as Array<{ name: string; qty: number; options?: OptionGroup[]; size?: string | null; availableFlavors?: string[] }>
 				return parsed.map(i => {
 					const parts = [`${i.qty}× ${i.name}`]
-					if (i.size) parts.push(i.size)
-					if (i.availableFlavors?.length) parts.push(i.availableFlavors.join(', '))
+					if (i.options?.length) {
+						for (const g of i.options) {
+							if (g.choices.length > 0) parts.push(`${g.label}: ${g.choices.slice(0, 2).join(', ')}${g.choices.length > 2 ? '…' : ''}`)
+						}
+					} else {
+						if (i.size) parts.push(i.size)
+						if (i.availableFlavors?.length) parts.push(i.availableFlavors.join(', '))
+					}
 					return parts.join(' · ')
 				})
 			} catch { /* fall through */ }
