@@ -1,0 +1,9 @@
+# Local development secrets template
+# Copy to application-local.properties and fill in your values
+spring.datasource.password=your_db_password
+jwt.secret=your-256-bit-jwt-secret-key-change-in-production
+resend.api-key=re_your_resend_api_key
+resend.from=Buddy Feast <no-reply@your-domain.com>
+cloudinary.cloud-name=your_cloud_name
+cloudinary.api-key=your_api_key
+cloudinary.api-secret=your_api_secret
