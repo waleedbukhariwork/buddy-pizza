@@ -9,12 +9,12 @@ class ApiClient {
 	constructor() {
 		this.instance = axios.create({
 			baseURL: API_BASE_URL,
+			timeout: 15000,
 			headers: {
 				'Content-Type': 'application/json',
 			},
 		})
 
-		// Interceptor to add token to requests
 		this.instance.interceptors.request.use((config) => {
 			const token =
 				typeof window !== 'undefined' ? localStorage.getItem('token') : null
@@ -23,6 +23,29 @@ class ApiClient {
 			}
 			return config
 		})
+
+		this.instance.interceptors.response.use(
+			(response) => response,
+			(error) => {
+				if (typeof window === 'undefined') return Promise.reject(error)
+
+				if (error.response?.status === 401) {
+					localStorage.removeItem('token')
+					localStorage.removeItem('user')
+					window.location.href = '/'
+					return Promise.reject(error)
+				}
+
+				const data = error.response?.data
+				const message =
+					data?.message ||
+					error.message ||
+					'An unexpected error occurred'
+				const errorCode = data?.errorCode || null
+
+				return Promise.reject({ ...error, message, errorCode })
+			}
+		)
 	}
 
 	get<T = unknown>(...args: Parameters<AxiosInstance['get']>) {

@@ -221,6 +221,9 @@ export function AdminOrders() {
 		setActionLoading(orderId)
 		try {
 			await updateOrderStatus(orderId, status)
+			mutate()
+		} catch {
+			console.error('Failed to update order', orderId)
 		} finally {
 			setActionLoading(null)
 		}

@@ -8,7 +8,7 @@ export const ROUTES = {
 	// Auth
 	AUTH_CUSTOMER_LOGIN: '/auth/customer/login',
 	AUTH_CUSTOMER_REGISTER: '/auth/customer/register',
-	AUTH_ADMIN_LOGIN: '/auth/admin/login',
+	AUTH_ADMIN_LOGIN: '/v1/auth/admin/login',
 	AUTH_RIDER_LOGIN: '/auth/rider/login',
 
 	// Products

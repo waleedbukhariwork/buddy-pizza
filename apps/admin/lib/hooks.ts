@@ -1,6 +1,6 @@
 import useSWR, { mutate as globalMutate } from 'swr'
 import { apiClient } from './api-client'
-import type { AdminProfile, Order, DashboardMetrics, Product, Deal, Category } from './types'
+import type { AdminProfile, Order, DashboardMetrics, Product, Deal, Category, SubCategory } from './types'
 
 async function fetcher<T>(url: string): Promise<T> {
 	const { data } = await apiClient.get<T>(url)
@@ -103,13 +103,45 @@ export async function deleteProduct(id: number) {
 	await globalMutate('/v1/products')
 }
 
-export async function createCategory(data: Pick<Category, 'name'>) {
-	const { data: category } = await apiClient.post<Category>('/v1/admin/categories', {
-		name: data.name,
-		isActive: true,
-	})
+export function useSubCategories(categoryId: number | null) {
+	return useSWR<SubCategory[]>(
+		categoryId != null ? `/v1/admin/subcategories?categoryId=${categoryId}` : null,
+		(url: string) => fetchList<SubCategory>(url),
+	)
+}
+
+export async function createSubCategory(data: { categoryId: number; name: string; displayOrder?: number }): Promise<SubCategory> {
+	const { data: sub } = await apiClient.post<SubCategory>('/v1/admin/subcategories', data)
+	await globalMutate((key: unknown) => typeof key === 'string' && key.startsWith('/v1/admin/subcategories'), undefined, { revalidate: true })
+	return sub
+}
+
+export async function updateSubCategory(id: number, data: { name?: string; displayOrder?: number; isActive?: boolean }): Promise<SubCategory> {
+	const { data: sub } = await apiClient.put<SubCategory>(`/v1/admin/subcategories/${id}`, data)
+	await globalMutate((key: unknown) => typeof key === 'string' && key.startsWith('/v1/admin/subcategories'), undefined, { revalidate: true })
+	return sub
+}
+
+export async function deleteSubCategory(id: number): Promise<void> {
+	await apiClient.delete(`/v1/admin/subcategories/${id}`)
+	await globalMutate((key: unknown) => typeof key === 'string' && key.startsWith('/v1/admin/subcategories'), undefined, { revalidate: true })
+}
+
+export async function createCategory(data: { name: string; icon?: string; displayOrder?: number }): Promise<Category> {
+	const { data: category } = await apiClient.post<Category>('/v1/admin/categories', { ...data, isActive: true })
 	await globalMutate('/v1/admin/categories')
 	return category
+}
+
+export async function updateCategory(id: number, data: { name?: string; icon?: string; displayOrder?: number; isActive?: boolean }): Promise<Category> {
+	const { data: category } = await apiClient.put<Category>(`/v1/admin/categories/${id}`, data)
+	await globalMutate('/v1/admin/categories')
+	return category
+}
+
+export async function deleteCategory(id: number): Promise<void> {
+	await apiClient.delete(`/v1/admin/categories/${id}`)
+	await globalMutate('/v1/admin/categories')
 }
 
 export async function saveDeal(id: number | null, data: Omit<Deal, 'id'>) {

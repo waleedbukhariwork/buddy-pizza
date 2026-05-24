@@ -42,6 +42,8 @@ export function OrderDetailDrawer({
 			await updateOrderStatus(order.id, act.next)
 			onUpdated?.()
 			onClose()
+		} catch {
+			console.error('Failed to update order', order.id)
 		} finally {
 			setLoading(false)
 		}

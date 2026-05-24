@@ -147,7 +147,8 @@ export function AdminProfileView() {
 			setDirty(false)
 			setSaveMsg({ ok: true, text: 'Profile saved.' })
 		} catch (err: unknown) {
-			const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to save profile.'
+			const axiosErr = err as { response?: { data?: { message?: string } }; message?: string; errorCode?: string }
+			const msg = axiosErr.response?.data?.message || axiosErr.message || 'Failed to save profile.'
 			setSaveMsg({ ok: false, text: msg })
 		} finally {
 			setSaving(false)
@@ -172,10 +173,14 @@ export function AdminProfileView() {
 			setNewPassword('')
 			setConfirmPassword('')
 		} catch (err: unknown) {
-			const status = (err as { response?: { status?: number } })?.response?.status
+			const axiosErr = err as { response?: { status?: number; data?: { message?: string } }; message?: string; errorCode?: string }
+			const status = axiosErr.response?.status
+			const errorCode = axiosErr.errorCode
 			const msg = status === 401
 				? 'Current password is incorrect.'
-				: (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to change password.'
+				: errorCode === 'ENDPOINT_NOT_FOUND'
+					? 'Route not found.'
+					: axiosErr.response?.data?.message || axiosErr.message || 'Failed to change password.'
 			setPwMsg({ ok: false, text: msg })
 		} finally {
 			setChangingPw(false)

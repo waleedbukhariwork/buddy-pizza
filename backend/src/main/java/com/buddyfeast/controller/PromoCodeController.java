@@ -1,6 +1,8 @@
 package com.buddyfeast.controller;
 
 import com.buddyfeast.service.PromoCodeService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,12 +20,13 @@ public class PromoCodeController {
 
     @Getter @Setter
     public static class ValidateRequest {
+        @NotBlank(message = "Promo code is required")
         private String code;
         private double cartTotal;
     }
 
     @PostMapping("/validate")
-    public ResponseEntity<Map<String, Object>> validate(@RequestBody ValidateRequest req) {
+    public ResponseEntity<Map<String, Object>> validate(@Valid @RequestBody ValidateRequest req) {
         PromoCodeService.PromoResult result = promoCodeService.validate(req.getCode(), req.getCartTotal());
         return ResponseEntity.ok(Map.of(
             "valid",    result.isValid(),

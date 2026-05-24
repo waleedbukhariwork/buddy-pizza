@@ -1,8 +1,10 @@
 package com.buddyfeast.service;
 
 import com.buddyfeast.entity.Rider;
+import com.buddyfeast.exception.AppException;
 import com.buddyfeast.repository.RiderRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -18,7 +20,7 @@ public class RiderService {
     
     public Rider getRiderById(Long id) {
         return riderRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Rider not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Rider not found"));
     }
     
     public Rider createRider(Rider rider) {
@@ -27,7 +29,7 @@ public class RiderService {
     
     public Rider updateRider(Long id, Rider riderDetails) {
         Rider rider = riderRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Rider not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Rider not found"));
         
         rider.setPhone(riderDetails.getPhone());
         rider.setStatus(riderDetails.getStatus());

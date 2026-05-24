@@ -1,7 +1,9 @@
 package com.buddyfeast.controller;
 
+import com.buddyfeast.exception.AppException;
 import com.buddyfeast.service.UploadService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,9 +24,9 @@ public class UploadController {
             @RequestParam(value = "folder", required = false) String folder) {
         try {
             String url = uploadService.uploadImage(file, folder);
-            return ResponseEntity.ok(Map.of("url", url));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest()
+            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("url", url));
+        } catch (AppException e) {
+            return ResponseEntity.status(e.getStatus())
                     .body(Map.of("error", e.getMessage()));
         } catch (IOException e) {
             return ResponseEntity.internalServerError()

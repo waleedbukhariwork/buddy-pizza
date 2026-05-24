@@ -2,11 +2,11 @@ package com.buddyfeast.service;
 
 import com.buddyfeast.dto.DealDTO;
 import com.buddyfeast.entity.Deal;
+import com.buddyfeast.exception.AppException;
 import com.buddyfeast.repository.DealRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -42,7 +42,7 @@ public class DealService {
         return dealRepository.findById(id)
             .filter(d -> !Boolean.TRUE.equals(d.getDeleted()))
             .map(this::convertToDTO)
-            .orElseThrow(() -> new RuntimeException("Deal not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Deal not found"));
     }
 
     public Deal createDeal(Deal deal) {
@@ -53,7 +53,7 @@ public class DealService {
     public Deal updateDeal(Long id, Deal dealDetails) {
         validatePricing(dealDetails);
         Deal deal = dealRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Deal not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Deal not found"));
 
         deal.setTitle(dealDetails.getTitle());
         deal.setDescription(dealDetails.getDescription());
@@ -76,24 +76,24 @@ public class DealService {
 
     private void validatePricing(Deal deal) {
         if (deal.getTitle() == null || deal.getTitle().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Deal title is required");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Deal title is required");
         }
         if (deal.getOriginalPrice() != null && deal.getDiscountPrice() != null
                 && deal.getDiscountPrice() > deal.getOriginalPrice()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new AppException(HttpStatus.BAD_REQUEST,
                 "Deal price (Rs." + deal.getDiscountPrice().intValue() +
                 ") cannot be greater than original price (Rs." + deal.getOriginalPrice().intValue() + ")");
         }
         if (deal.getStartsAt() != null && deal.getExpiresAt() != null
                 && !deal.getExpiresAt().isAfter(deal.getStartsAt())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new AppException(HttpStatus.BAD_REQUEST,
                 "Expiry date must be after start date");
         }
     }
 
     public void deleteDeal(Long id) {
         Deal deal = dealRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Deal not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Deal not found"));
         if (Boolean.TRUE.equals(deal.getDeleted())) return;
         deal.setDeleted(true);
         dealRepository.save(deal);

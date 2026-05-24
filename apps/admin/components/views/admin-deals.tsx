@@ -728,8 +728,14 @@ function DealModal({ deal, products, onClose, onSaved }: {
 			} as Omit<Deal, 'id'>)
 			onSaved()
 		} catch (e: unknown) {
-			const axiosErr = e as { response?: { data?: { message?: string } } }
-			setError(axiosErr?.response?.data?.message ?? 'Failed to save. Please try again.')
+			const axiosErr = e as { response?: { data?: { message?: string } }; message?: string; errorCode?: string }
+			const msg = axiosErr?.response?.data?.message || axiosErr?.message
+			const errorCode = axiosErr?.errorCode
+			if (errorCode === 'ENDPOINT_NOT_FOUND') {
+				setError('Route not found.')
+			} else {
+				setError(msg || 'Failed to save. Please try again.')
+			}
 		} finally {
 			setSaving(false)
 		}

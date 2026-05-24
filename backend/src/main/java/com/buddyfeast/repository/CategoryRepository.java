@@ -9,5 +9,6 @@ import java.util.Optional;
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long> {
     List<Category> findByIsActiveTrueOrderByDisplayOrderAscNameAsc();
+    List<Category> findAllByOrderByDisplayOrderAscNameAsc();
     Optional<Category> findByNameIgnoreCase(String name);
 }

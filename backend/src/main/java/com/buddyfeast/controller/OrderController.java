@@ -6,6 +6,7 @@ import com.buddyfeast.entity.User;
 import com.buddyfeast.exception.AppException;
 import com.buddyfeast.repository.UserRepository;
 import com.buddyfeast.service.OrderService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,8 +38,9 @@ public class OrderController {
     }
     
     @PostMapping
-    public ResponseEntity<OrderDTO> createOrder(@RequestBody CreateOrderRequest request) {
-        return ResponseEntity.ok(orderService.createOrder(request, getAuthenticatedUserId()));
+    public ResponseEntity<OrderDTO> createOrder(@Valid @RequestBody CreateOrderRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(orderService.createOrder(request, getAuthenticatedUserId()));
     }
     
     @GetMapping("/{id}")

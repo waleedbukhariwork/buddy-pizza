@@ -333,8 +333,10 @@ export function ProfileView() {
 			}
 			setEditing(false)
 			showToast('Profile saved', 'success')
-		} catch {
-			showToast('Failed to save. Try again.', 'error')
+		} catch (err: unknown) {
+			const errorCode = (err as { errorCode?: string })?.errorCode
+			const msg = errorCode === 'ENDPOINT_NOT_FOUND' ? 'Route not found.' : 'Failed to save. Try again.'
+			showToast(msg, 'error')
 		} finally {
 			setSaving(false)
 		}
@@ -351,9 +353,13 @@ export function ProfileView() {
 			setPwOpen(false)
 			showToast('Password updated', 'success')
 		} catch (err: unknown) {
-			const status = (err as { response?: { status?: number } })?.response?.status
+			const axiosErr = err as { response?: { status?: number }; errorCode?: string }
+			const status = axiosErr.response?.status
+			const errorCode = axiosErr.errorCode
 			if (status === 401) {
 				setPwError('Current password is incorrect.')
+			} else if (errorCode === 'ENDPOINT_NOT_FOUND') {
+				setPwError('Route not found.')
 			} else {
 				setPwError('Something went wrong. Try again.')
 			}

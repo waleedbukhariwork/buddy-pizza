@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { ErrorBoundary } from '../components/ui/error-boundary'
 
 export const metadata: Metadata = {
 	title: 'Buddy Feast Rider',
@@ -18,7 +19,9 @@ export default function RootLayout({
 				<link rel='preconnect' href='https://fonts.gstatic.com' crossOrigin='anonymous' />
 				<link href='https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap' rel='stylesheet' />
 			</head>
-			<body className='antialiased'>{children}</body>
+			<body className='antialiased'>
+				<ErrorBoundary>{children}</ErrorBoundary>
+			</body>
 		</html>
 	)
 }

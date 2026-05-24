@@ -3,9 +3,13 @@ package com.buddyfeast.service;
 import com.buddyfeast.dto.PageResponse;
 import com.buddyfeast.dto.ProductDTO;
 import com.buddyfeast.entity.Category;
+import com.buddyfeast.exception.AppException;
+import org.springframework.http.HttpStatus;
 import com.buddyfeast.entity.Product;
+import com.buddyfeast.entity.SubCategory;
 import com.buddyfeast.repository.CategoryRepository;
 import com.buddyfeast.repository.ProductRepository;
+import com.buddyfeast.repository.SubCategoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -16,25 +20,28 @@ import java.util.stream.Collectors;
 
 @Service
 public class ProductService {
-    
+
     @Autowired
     private ProductRepository productRepository;
-    
+
     @Autowired
     private CategoryRepository categoryRepository;
-    
+
+    @Autowired
+    private SubCategoryRepository subCategoryRepository;
+
     public List<ProductDTO> getAllProducts() {
         return productRepository.findNotDeleted()
             .stream()
             .map(this::convertToDTO)
             .collect(Collectors.toList());
     }
-    
+
     public ProductDTO getProductById(Long id) {
         return productRepository.findById(id)
             .filter(p -> !Boolean.TRUE.equals(p.getDeleted()))
             .map(this::convertToDTO)
-            .orElseThrow(() -> new RuntimeException("Product not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Product not found"));
     }
 
     private static final int MAX_PAGE_SIZE = 50;
@@ -67,18 +74,19 @@ public class ProductService {
             .discountAmount(productDetails.getDiscountAmount())
             .sizesJson(productDetails.getSizesJson())
             .category(resolveCategory(productDetails))
+            .subCategory(resolveSubCategory(productDetails))
             .isAvailable(productDetails.getIsAvailable() != null ? productDetails.getIsAvailable() : true)
             .isHot(productDetails.getIsHot() != null ? productDetails.getIsHot() : false)
             .hasSizes(productDetails.getHasSizes() != null ? productDetails.getHasSizes() : false)
             .build();
-        
+
         return productRepository.save(product);
     }
-    
+
     public Product updateProduct(Long id, ProductDTO productDetails) {
         Product product = productRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Product not found"));
-        
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Product not found"));
+
         product.setName(productDetails.getName());
         product.setDescription(productDetails.getDescription());
         product.setPrice(productDetails.getPrice());
@@ -96,19 +104,25 @@ public class ProductService {
         product.setIsHot(productDetails.getIsHot());
         product.setHasSizes(productDetails.getHasSizes());
         product.setCategory(resolveCategory(productDetails));
-        
+        product.setSubCategory(resolveSubCategory(productDetails));
+
         return productRepository.save(product);
     }
-    
+
+    public long countByCategory(Long categoryId) {
+        return productRepository.countByCategoryId(categoryId);
+    }
+
     public void deleteProduct(Long id) {
         Product product = productRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Product not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Product not found"));
         if (Boolean.TRUE.equals(product.getDeleted())) return;
         product.setDeleted(true);
         productRepository.save(product);
     }
-    
+
     private ProductDTO convertToDTO(Product product) {
+        SubCategory sub = product.getSubCategory();
         return ProductDTO.builder()
             .id(product.getId())
             .name(product.getName())
@@ -126,18 +140,20 @@ public class ProductService {
             .sizesJson(product.getSizesJson())
             .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
             .category(product.getCategory() != null ? product.getCategory().getName() : "")
+            .subCategoryId(sub != null ? sub.getId() : null)
+            .subCategoryName(sub != null ? sub.getName() : null)
             .isAvailable(product.getIsAvailable())
             .isHot(product.getIsHot())
             .hasSizes(product.getHasSizes())
             .build();
     }
-    
+
     private Category resolveCategory(ProductDTO productDetails) {
         if (productDetails.getCategoryId() != null) {
             return categoryRepository.findById(productDetails.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Category not found"));
         }
-        
+
         if (productDetails.getCategory() != null && !productDetails.getCategory().isBlank()) {
             return categoryRepository.findByNameIgnoreCase(productDetails.getCategory().trim())
                 .orElseGet(() -> categoryRepository.save(Category.builder()
@@ -145,7 +161,13 @@ public class ProductService {
                     .isActive(true)
                     .build()));
         }
-        
-        throw new RuntimeException("Category is required");
+
+        throw new AppException(HttpStatus.BAD_REQUEST, "Category is required");
+    }
+
+    private SubCategory resolveSubCategory(ProductDTO productDetails) {
+        if (productDetails.getSubCategoryId() == null) return null;
+        return subCategoryRepository.findById(productDetails.getSubCategoryId())
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "SubCategory not found"));
     }
 }

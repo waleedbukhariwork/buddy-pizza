@@ -4,6 +4,7 @@ import com.buddyfeast.dto.ChangePasswordRequest;
 import com.buddyfeast.dto.UpdateProfileRequest;
 import com.buddyfeast.dto.UserDTO;
 import com.buddyfeast.entity.User;
+import com.buddyfeast.exception.AppException;
 import com.buddyfeast.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -59,7 +60,7 @@ public class UserController {
         return (isEmail
                 ? userRepository.findByEmail(identifier)
                 : userRepository.findByPhone(identifier))
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
     private UserDTO toDTO(User user) {

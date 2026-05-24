@@ -5,9 +5,9 @@ import com.buddyfeast.dto.OrderDTO;
 import com.buddyfeast.entity.*;
 import com.buddyfeast.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import com.buddyfeast.exception.AppException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -39,7 +39,7 @@ public class OrderService {
 
     public OrderDTO createOrder(CreateOrderRequest request, Long userId) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
 
         // Validate promo code before processing items (fail fast)
         double promoDiscount = 0.0;
@@ -65,14 +65,14 @@ public class OrderService {
         List<OrderItem> items = request.getItems().stream().map(itemReq -> {
             if (itemReq.getDealId() != null) {
                 Deal deal = dealRepository.findById(itemReq.getDealId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Deal not found"));
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Deal not found"));
 
                 if (Boolean.FALSE.equals(deal.getIsActive()))
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Deal '" + deal.getTitle() + "' is no longer active");
+                    throw new AppException(HttpStatus.BAD_REQUEST, "Deal '" + deal.getTitle() + "' is no longer active");
                 if (deal.getExpiresAt() != null && !now.isBefore(deal.getExpiresAt()))
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Deal '" + deal.getTitle() + "' has expired");
+                    throw new AppException(HttpStatus.BAD_REQUEST, "Deal '" + deal.getTitle() + "' has expired");
                 if (deal.getMaxOrders() != null && deal.getOrdersCount() != null && deal.getOrdersCount() >= deal.getMaxOrders())
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Deal '" + deal.getTitle() + "' is sold out");
+                    throw new AppException(HttpStatus.BAD_REQUEST, "Deal '" + deal.getTitle() + "' is sold out");
 
                 deal.setOrdersCount(deal.getOrdersCount() + itemReq.getQuantity());
                 dealRepository.save(deal);
@@ -88,7 +88,7 @@ public class OrderService {
                     .build();
             } else {
                 Product product = productRepository.findById(itemReq.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Product not found"));
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Product not found"));
                 double price = itemReq.getPrice() != null ? itemReq.getPrice() : product.getPrice();
                 return OrderItem.builder()
                     .order(order)
@@ -130,12 +130,12 @@ public class OrderService {
     public OrderDTO getOrderById(Long id) {
         return orderRepository.findById(id)
             .map(this::convertToDTO)
-            .orElseThrow(() -> new RuntimeException("Order not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Order not found"));
     }
     
     public List<OrderDTO> getOrdersByUser(Long userId) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
         
         return orderRepository.findByUser(user)
             .stream()
@@ -145,7 +145,7 @@ public class OrderService {
     
     public Order updateOrderStatus(Long orderId, Order.OrderStatus status) {
         Order order = orderRepository.findById(orderId)
-            .orElseThrow(() -> new RuntimeException("Order not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Order not found"));
 
         Order.OrderStatus previousStatus = order.getStatus();
         order.setStatus(status);
@@ -160,10 +160,10 @@ public class OrderService {
     
     public Order assignRider(Long orderId, Long riderId) {
         Order order = orderRepository.findById(orderId)
-            .orElseThrow(() -> new RuntimeException("Order not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Order not found"));
 
         Rider rider = riderRepository.findById(riderId)
-            .orElseThrow(() -> new RuntimeException("Rider not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Rider not found"));
 
         Order.OrderStatus previousStatus = order.getStatus();
         order.setRider(rider);

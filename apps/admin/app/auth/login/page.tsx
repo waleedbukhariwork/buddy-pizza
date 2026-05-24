@@ -23,8 +23,23 @@ export default function AdminLoginPage() {
 			}>('/v1/auth/admin/login', { phoneOrEmail: email.trim().toLowerCase(), password })
 			setToken(data.token)
 			router.push('/')
-		} catch {
-			setError('Invalid credentials. Please check your email and password.')
+		} catch (err: unknown) {
+			const axiosErr = err as { response?: { status?: number }; message?: string; errorCode?: string }
+			const status = axiosErr.response?.status
+			const errorCode = axiosErr.errorCode
+			if (status === 401) {
+				setError('Incorrect password.')
+			} else if (status === 404) {
+				setError('No admin account found with this email.')
+			} else if (status === 429) {
+				setError('Too many attempts. Please try again later.')
+			} else if (errorCode === 'ENDPOINT_NOT_FOUND') {
+				setError('Route not found.')
+			} else if (!status || status >= 500) {
+				setError('Server error. Please try again.')
+			} else {
+				setError('Invalid credentials. Please check your email and password.')
+			}
 		} finally {
 			setLoading(false)
 		}

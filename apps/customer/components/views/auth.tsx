@@ -893,10 +893,10 @@ function AuthSignIn() {
 				router.push(redirect ?? '/')
 			}
 		} catch (err: unknown) {
-			const status = (err as { response?: { status?: number } })?.response
-				?.status
-			const msg = (err as { response?: { data?: { message?: string } } })
-				?.response?.data?.message
+			const axiosErr = err as { response?: { status?: number; data?: { message?: string } }; message?: string; errorCode?: string }
+			const status = axiosErr.response?.status
+			const msg = axiosErr.response?.data?.message || axiosErr.message
+			const errorCode = axiosErr.errorCode
 			if (msg === 'UNVERIFIED') {
 				try {
 					await apiClient.post('/v1/auth/customer/resend-otp', {
@@ -910,6 +910,8 @@ function AuthSignIn() {
 				setError('Incorrect password.')
 			} else if (status === 404) {
 				setError('No account found with that email.')
+			} else if (errorCode === 'ENDPOINT_NOT_FOUND' || errorCode === 'METHOD_NOT_ALLOWED') {
+				setError('Route not found.')
 			} else {
 				setError(msg || 'Something went wrong. Please try again.')
 			}
@@ -1304,12 +1306,14 @@ function AuthSignUp() {
 			setOtpData({ identifier: data.identifier })
 			setStep('otp')
 		} catch (err: unknown) {
-			const status = (err as { response?: { status?: number } })?.response
-				?.status
-			const msg = (err as { response?: { data?: { message?: string } } })
-				?.response?.data?.message
+			const axiosErr = err as { response?: { status?: number; data?: { message?: string } }; message?: string; errorCode?: string }
+			const status = axiosErr.response?.status
+			const msg = axiosErr.response?.data?.message || axiosErr.message
+			const errorCode = axiosErr.errorCode
 			if (status === 409) {
 				setError(msg || 'An account with this contact already exists.')
+			} else if (errorCode === 'ENDPOINT_NOT_FOUND') {
+				setError('Route not found.')
 			} else {
 				setError(msg || 'Registration failed. Please try again.')
 			}

@@ -9,10 +9,16 @@ import { Skeleton } from '../ui/skeleton'
 import {
 	useProducts,
 	useCategories,
+	useSubCategories,
 	createProduct,
 	updateProduct,
 	deleteProduct,
 	createCategory,
+	updateCategory,
+	deleteCategory,
+	createSubCategory,
+	updateSubCategory,
+	deleteSubCategory,
 	rs,
 } from '../../lib/hooks'
 import type { Product, Category } from '../../lib/types'
@@ -33,6 +39,7 @@ interface ProductForm {
 	description: string
 	categoryId: number | null
 	category: string
+	subCategoryId: number | null
 	imageUrl: string | null
 	isAvailable: boolean
 	isHot: boolean
@@ -84,6 +91,7 @@ function formFromProduct(p: Product): ProductForm {
 		description: p.description ?? '',
 		categoryId: p.categoryId ?? null,
 		category: p.category,
+		subCategoryId: p.subCategoryId ?? null,
 		imageUrl: p.imageUrl ?? null,
 		isAvailable: p.isAvailable,
 		isHot: p.isHot ?? false,
@@ -105,6 +113,7 @@ function mapFormToPayload(form: ProductForm) {
 		description: form.description.trim() || null,
 		categoryId: form.categoryId,
 		category: form.category,
+		subCategoryId: form.subCategoryId,
 		imageUrl: form.imageUrl,
 		isAvailable: form.isAvailable,
 		isHot: form.isHot,
@@ -129,6 +138,7 @@ const EMPTY_FORM: ProductForm = {
 	description: '',
 	categoryId: null,
 	category: '',
+	subCategoryId: null,
 	imageUrl: null,
 	isAvailable: true,
 	isHot: false,
@@ -504,6 +514,12 @@ function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryC
 	const [newCatName, setNewCatName] = useState('')
 	const [creatingCat, setCreatingCat] = useState(false)
 	const [catError, setCatError] = useState<string | null>(null)
+	const [subCatDialogOpen, setSubCatDialogOpen] = useState(false)
+	const [newSubCatName, setNewSubCatName] = useState('')
+	const [creatingSubCat, setCreatingSubCat] = useState(false)
+	const [subCatError, setSubCatError] = useState<string | null>(null)
+
+	const { data: subCategories, mutate: refreshSubCats } = useSubCategories(form.categoryId)
 
 	function updateSize(idx: number, s: ProductSize) {
 		setForm(f => ({ ...f, sizes: f.sizes.map((v, i) => i === idx ? s : v) }))
@@ -553,13 +569,32 @@ function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryC
 		setCatError(null)
 		try {
 			const cat = await onCategoryCreate(name)
-			setForm(f => ({ ...f, categoryId: cat.id, category: cat.name }))
+			setForm(f => ({ ...f, categoryId: cat.id, category: cat.name, subCategoryId: null }))
 			setNewCatName('')
 			setCatDialogOpen(false)
 		} catch {
 			setCatError('Failed to create category.')
 		} finally {
 			setCreatingCat(false)
+		}
+	}
+
+	async function handleCreateSubCategory() {
+		if (!form.categoryId) return
+		const name = newSubCatName.trim()
+		if (!name) { setSubCatError('Name is required.'); return }
+		setCreatingSubCat(true)
+		setSubCatError(null)
+		try {
+			const sub = await createSubCategory({ categoryId: form.categoryId, name })
+			await refreshSubCats()
+			setForm(f => ({ ...f, subCategoryId: sub.id }))
+			setNewSubCatName('')
+			setSubCatDialogOpen(false)
+		} catch {
+			setSubCatError('Failed to create sub-category.')
+		} finally {
+			setCreatingSubCat(false)
 		}
 	}
 
@@ -612,7 +647,7 @@ function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryC
 											value={form.categoryId ?? ''}
 											onChange={e => {
 												const cat = categories.find(c => c.id === Number(e.target.value))
-												setForm(f => ({ ...f, categoryId: cat?.id ?? null, category: cat?.name ?? '' }))
+												setForm(f => ({ ...f, categoryId: cat?.id ?? null, category: cat?.name ?? '', subCategoryId: null }))
 											}}
 										>
 											<option value='' disabled>Select category</option>
@@ -629,6 +664,32 @@ function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryC
 										{Icons.plus} New
 									</button>
 								</div>
+
+								{/* Sub-category row — only shown when a category is selected */}
+								{form.categoryId != null && (
+									<div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'end' }}>
+										<div>
+											<label className='bf-label'>Sub-category <span style={{ color: 'var(--bf-mute)', fontWeight: 400 }}>(optional)</span></label>
+											<select
+												className='bf-input'
+												value={form.subCategoryId ?? ''}
+												onChange={e => setForm(f => ({ ...f, subCategoryId: e.target.value ? Number(e.target.value) : null }))}
+											>
+												<option value=''>None</option>
+												{(subCategories ?? []).map(s => (
+													<option key={s.id} value={s.id}>{s.name}</option>
+												))}
+											</select>
+										</div>
+										<button
+											className='bf-btn bf-btn-outline bf-btn-sm'
+											onClick={() => { setSubCatError(null); setSubCatDialogOpen(true) }}
+											style={{ whiteSpace: 'nowrap', height: 44 }}
+										>
+											{Icons.plus} New
+										</button>
+									</div>
+								)}
 								<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
 									{([
 										{ key: 'isHot' as const, icon: '🌶', label: 'Hot item', desc: 'Shows a hot badge' },
@@ -853,36 +914,458 @@ function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryC
 					</div>
 				</div>
 			)}
+
+			{/* Sub-category sub-modal */}
+			{subCatDialogOpen && (
+				<div
+					style={{ position: 'fixed', inset: 0, background: 'rgba(35,31,32,.5)', display: 'grid', placeItems: 'center', zIndex: 70 }}
+					onClick={() => !creatingSubCat && setSubCatDialogOpen(false)}
+				>
+					<div className='bf-card' style={{ padding: 28, maxWidth: 380, width: '100%', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
+						<h3 style={{ fontWeight: 800, fontSize: 17, marginBottom: 6 }}>Add sub-category</h3>
+						<p style={{ fontSize: 13, color: 'var(--bf-mute)', marginBottom: 18 }}>Groups items within <strong>{form.category}</strong>. The new sub-category will be auto-selected.</p>
+						<div style={{ marginBottom: 14 }}>
+							<label className='bf-label'>Sub-category name <span className='bf-req'>*</span></label>
+							<input
+								className='bf-input'
+								value={newSubCatName}
+								onChange={e => setNewSubCatName(e.target.value)}
+								onKeyDown={e => e.key === 'Enter' && handleCreateSubCategory()}
+								placeholder='e.g. Regular, Special, Extreme…'
+								autoFocus
+							/>
+						</div>
+						{subCatError && (
+							<div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(232,67,31,.1)', color: 'var(--bf-ember)', fontSize: 12.5, fontWeight: 600, marginBottom: 14 }}>
+								{subCatError}
+							</div>
+						)}
+						<div style={{ display: 'flex', gap: 8 }}>
+							<button className='bf-btn bf-btn-outline bf-btn-md' style={{ flex: 1 }} disabled={creatingSubCat} onClick={() => setSubCatDialogOpen(false)}>Cancel</button>
+							<button className='bf-btn bf-btn-primary bf-btn-md' style={{ flex: 1 }} disabled={creatingSubCat} onClick={handleCreateSubCategory}>
+								{creatingSubCat ? 'Creating…' : 'Create'}
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	)
+}
+
+// ─── Shared confirm dialog ────────────────────────────────────────────────────
+function ConfirmDialog({ title, body, confirmLabel, danger, onConfirm, onCancel, busy }: {
+	title: string; body: React.ReactNode; confirmLabel: string; danger?: boolean
+	onConfirm: () => void; onCancel: () => void; busy: boolean
+}) {
+	return (
+		<div style={{ position: 'fixed', inset: 0, background: 'rgba(35,31,32,.55)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center', zIndex: 80 }}
+			onClick={() => !busy && onCancel()}>
+			<div className='bf-card' style={{ padding: 28, maxWidth: 360, width: '100%', borderRadius: 18 }} onClick={e => e.stopPropagation()}>
+				<div style={{ width: 40, height: 40, borderRadius: 10, background: danger ? 'rgba(232,67,31,.1)' : 'var(--bf-cream-2)', display: 'grid', placeItems: 'center', marginBottom: 14, color: danger ? 'var(--bf-ember)' : 'var(--bf-ink)', fontSize: 18 }}>
+					{danger ? Icons.trash : '⚠'}
+				</div>
+				<h3 style={{ fontWeight: 800, fontSize: 17, marginBottom: 6 }}>{title}</h3>
+				<div style={{ fontSize: 13, color: 'var(--bf-mute)', marginBottom: 22, lineHeight: 1.5 }}>{body}</div>
+				<div style={{ display: 'flex', gap: 8 }}>
+					<button className='bf-btn bf-btn-outline bf-btn-md' style={{ flex: 1 }} disabled={busy} onClick={onCancel}>Cancel</button>
+					<button className='bf-btn bf-btn-primary bf-btn-md' style={{ flex: 1, background: danger ? 'var(--bf-ember)' : undefined }} disabled={busy} onClick={onConfirm}>
+						{busy ? 'Working…' : confirmLabel}
+					</button>
+				</div>
+			</div>
+		</div>
+	)
+}
+
+// ─── Sub-category manager ─────────────────────────────────────────────────────
+function SubCategoryManager({ categoryId, categoryName }: { categoryId: number; categoryName: string }) {
+	const { data: subCats, mutate: refresh } = useSubCategories(categoryId)
+	const [addOpen, setAddOpen] = useState(false)
+	const [newName, setNewName] = useState('')
+	const [adding, setAdding] = useState(false)
+	const [editId, setEditId] = useState<number | null>(null)
+	const [editName, setEditName] = useState('')
+	const [saving, setSaving] = useState(false)
+	const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string; productCount: number } | null>(null)
+	const [deleting, setDeleting] = useState(false)
+	const [error, setError] = useState<string | null>(null)
+
+	async function handleAdd() {
+		const name = newName.trim()
+		if (!name) return
+		setAdding(true)
+		setError(null)
+		try {
+			const order = (subCats?.length ?? 0) + 1
+			await createSubCategory({ categoryId, name, displayOrder: order })
+			await refresh()
+			setNewName('')
+			setAddOpen(false)
+		} catch { setError('Failed to add.') } finally { setAdding(false) }
+	}
+
+	async function handleRename(id: number) {
+		const name = editName.trim()
+		if (!name) return
+		setSaving(true)
+		setError(null)
+		try {
+			await updateSubCategory(id, { name })
+			await refresh()
+			setEditId(null)
+		} catch { setError('Failed to save.') } finally { setSaving(false) }
+	}
+
+	async function handleReorder(id: number, direction: 'up' | 'down') {
+		const list = subCats ?? []
+		const idx = list.findIndex(s => s.id === id)
+		if (idx < 0) return
+		const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+		if (swapIdx < 0 || swapIdx >= list.length) return
+		const [a, b] = [list[idx], list[swapIdx]]
+		await Promise.all([
+			updateSubCategory(a.id, { displayOrder: swapIdx + 1 }),
+			updateSubCategory(b.id, { displayOrder: idx + 1 }),
+		])
+		await refresh()
+	}
+
+	async function handleDelete() {
+		if (!deleteTarget) return
+		setDeleting(true)
+		try {
+			await deleteSubCategory(deleteTarget.id)
+			await refresh()
+			setDeleteTarget(null)
+		} catch { setError('Failed to delete.') } finally { setDeleting(false) }
+	}
+
+	const list = subCats ?? []
+
+	return (
+		<div style={{ marginTop: 10, borderTop: '1px solid var(--bf-line)', paddingTop: 10 }}>
+			<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 10px 8px' }}>
+				<span className='bf-eyebrow' style={{ fontSize: 9.5 }}>SUB-CATEGORIES</span>
+				<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 22, height: 22, fontSize: 14 }}
+					onClick={() => { setAddOpen(o => !o); setNewName(''); setError(null) }} title='Add sub-category'>
+					{Icons.plus}
+				</button>
+			</div>
+
+			{addOpen && (
+				<div style={{ padding: '0 10px 10px', display: 'flex', gap: 6 }}>
+					<input className='bf-input' value={newName} onChange={e => setNewName(e.target.value)}
+						onKeyDown={e => e.key === 'Enter' && handleAdd()} placeholder='e.g. Regular, Special…'
+						autoFocus style={{ fontSize: 12, height: 34, flex: 1 }} />
+					<button className='bf-btn bf-btn-primary bf-btn-sm' style={{ height: 34 }} disabled={adding} onClick={handleAdd}>
+						{adding ? '…' : 'Add'}
+					</button>
+				</div>
+			)}
+
+			{error && <p style={{ fontSize: 11, color: 'var(--bf-ember)', padding: '0 10px 6px', fontWeight: 600 }}>{error}</p>}
+
+			{list.length === 0 ? (
+				<p style={{ fontSize: 11, color: 'var(--bf-mute)', padding: '0 10px 4px' }}>No sub-categories for {categoryName}</p>
+			) : list.map((sub, idx) => (
+				<div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '3px 4px 3px 10px', borderRadius: 8 }}>
+					{editId === sub.id ? (
+						<>
+							<input className='bf-input' value={editName} onChange={e => setEditName(e.target.value)}
+								onKeyDown={e => { if (e.key === 'Enter') handleRename(sub.id); if (e.key === 'Escape') setEditId(null) }}
+								autoFocus style={{ fontSize: 12, height: 30, flex: 1 }} />
+							<button className='bf-btn bf-btn-primary bf-btn-sm' style={{ height: 28, padding: '0 8px', fontSize: 11 }} disabled={saving} onClick={() => handleRename(sub.id)}>
+								{saving ? '…' : 'Save'}
+							</button>
+							<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 24, height: 24 }} onClick={() => setEditId(null)}>✕</button>
+						</>
+					) : (
+						<>
+							{/* Reorder arrows */}
+							<div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+								<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 16, height: 14, fontSize: 8, opacity: idx === 0 ? 0.2 : 1 }}
+									disabled={idx === 0} onClick={() => handleReorder(sub.id, 'up')}>▲</button>
+								<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 16, height: 14, fontSize: 8, opacity: idx === list.length - 1 ? 0.2 : 1 }}
+									disabled={idx === list.length - 1} onClick={() => handleReorder(sub.id, 'down')}>▼</button>
+							</div>
+							<span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'var(--bf-ink-2)' }}>{sub.name}</span>
+							{(sub.productCount ?? 0) > 0 && (
+								<span className='bf-mono' style={{ fontSize: 9.5, color: 'var(--bf-mute)' }}>{sub.productCount}</span>
+							)}
+							<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 22, height: 22, fontSize: 11 }}
+								onClick={() => { setEditId(sub.id); setEditName(sub.name) }} title='Rename'>
+								{Icons.edit}
+							</button>
+							<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 22, height: 22, fontSize: 11, color: 'var(--bf-ember)' }}
+								onClick={() => setDeleteTarget({ id: sub.id, name: sub.name, productCount: sub.productCount ?? 0 })} title='Delete'>
+								{Icons.trash}
+							</button>
+						</>
+					)}
+				</div>
+			))}
+
+			{deleteTarget && (
+				<ConfirmDialog
+					title={`Delete "${deleteTarget.name}"?`}
+					body={deleteTarget.productCount > 0
+						? <><strong style={{ color: 'var(--bf-ember)' }}>{deleteTarget.productCount} product(s)</strong> are assigned to this sub-category. They will be unassigned (not deleted) and will appear ungrouped.</>
+						: 'This sub-category will be permanently removed.'}
+					confirmLabel='Delete'
+					danger
+					busy={deleting}
+					onConfirm={handleDelete}
+					onCancel={() => setDeleteTarget(null)}
+				/>
+			)}
+		</div>
+	)
+}
+
+// ─── Category sidebar manager ─────────────────────────────────────────────────
+function CategorySidebar({ categories, activeCat, onSelect, onCreated, products, isLoading }: {
+	categories: Category[]
+	activeCat: string | null
+	onSelect: (name: string) => void
+	onCreated: (cat: Category) => void
+	products: import('../../lib/types').Product[] | undefined
+	isLoading: boolean
+}) {
+	const [addOpen, setAddOpen] = useState(false)
+	const [newName, setNewName] = useState('')
+	const [adding, setAdding] = useState(false)
+	const [addError, setAddError] = useState<string | null>(null)
+
+	const [editId, setEditId] = useState<number | null>(null)
+	const [editName, setEditName] = useState('')
+	const [editSaving, setEditSaving] = useState(false)
+
+	const [toggleBusy, setToggleBusy] = useState<number | null>(null)
+	const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string; productCount: number } | null>(null)
+	const [deleting, setDeleting] = useState(false)
+	const [deleteError, setDeleteError] = useState<string | null>(null)
+
+	const allCats = useMemo(() =>
+		[...categories].sort((a, b) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999) || a.name.localeCompare(b.name)),
+		[categories])
+
+	async function handleAdd() {
+		const name = newName.trim()
+		if (!name) { setAddError('Name is required.'); return }
+		setAdding(true); setAddError(null)
+		try {
+			const cat = await createCategory({ name })
+			onCreated(cat)
+			setNewName(''); setAddOpen(false)
+		} catch { setAddError('Failed to create.') } finally { setAdding(false) }
+	}
+
+	async function handleRename(id: number) {
+		const name = editName.trim()
+		if (!name) return
+		setEditSaving(true)
+		try {
+			await updateCategory(id, { name })
+			setEditId(null)
+		} catch { /* ignore */ } finally { setEditSaving(false) }
+	}
+
+	async function handleToggleActive(cat: Category) {
+		setToggleBusy(cat.id)
+		try { await updateCategory(cat.id, { isActive: !cat.isActive }) }
+		catch { /* ignore */ } finally { setToggleBusy(null) }
+	}
+
+	async function handleDelete() {
+		if (!deleteTarget) return
+		setDeleting(true); setDeleteError(null)
+		try {
+			await deleteCategory(deleteTarget.id)
+			setDeleteTarget(null)
+			// If deleting the active category, clear selection
+			if (activeCat === deleteTarget.name) onSelect(allCats.find(c => c.name !== deleteTarget!.name)?.name ?? '')
+		} catch (e: unknown) {
+			const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
+			setDeleteError(msg ?? 'Failed to delete.')
+		} finally { setDeleting(false) }
+	}
+
+	return (
+		<div className='bf-card bf-admin-cat-sidebar' style={{ padding: 12, height: 'fit-content' }}>
+			<div className='bf-eyebrow' style={{ padding: '6px 10px 10px' }}>CATEGORIES</div>
+
+			{isLoading ? (
+				<div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 0' }}>
+					{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} h={34} r={8} />)}
+				</div>
+			) : allCats.length === 0 ? (
+				<p style={{ fontSize: 12, color: 'var(--bf-mute)', padding: '4px 10px' }}>No categories yet</p>
+			) : allCats.map(cat => {
+				const count = (products ?? []).filter(p => p.category === cat.name).length
+				const isActive = activeCat === cat.name
+				const isEditing = editId === cat.id
+				return (
+					<div key={cat.id}>
+						{isEditing ? (
+							<div style={{ display: 'flex', gap: 4, padding: '4px 6px', alignItems: 'center' }}>
+								<input className='bf-input' value={editName} autoFocus
+									onChange={e => setEditName(e.target.value)}
+									onKeyDown={e => { if (e.key === 'Enter') handleRename(cat.id); if (e.key === 'Escape') setEditId(null) }}
+									style={{ fontSize: 12, height: 32, flex: 1 }} />
+								<button className='bf-btn bf-btn-primary bf-btn-sm' style={{ height: 30, padding: '0 8px', fontSize: 11 }}
+									disabled={editSaving} onClick={() => handleRename(cat.id)}>
+									{editSaving ? '…' : 'Save'}
+								</button>
+								<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 26, height: 26 }} onClick={() => setEditId(null)}>✕</button>
+							</div>
+						) : (
+							<div style={{ display: 'flex', alignItems: 'center', gap: 2, borderRadius: 8, background: isActive ? 'var(--bf-cream-2)' : 'transparent' }}>
+								<button onClick={() => onSelect(cat.name)} style={{
+									flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+									padding: '9px 6px 9px 10px', border: 0, background: 'transparent',
+									borderRadius: 8, cursor: 'pointer', font: '600 13px var(--bf-font)',
+									textAlign: 'left', color: cat.isActive ? 'var(--bf-ink)' : 'var(--bf-mute)',
+								}}>
+									<span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+										{!cat.isActive && <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--bf-line)', color: 'var(--bf-mute)', borderRadius: 4, padding: '1px 4px' }}>OFF</span>}
+										{cat.name}
+									</span>
+									<span className='bf-mono' style={{ fontSize: 11, color: 'var(--bf-mute)' }}>{count}</span>
+								</button>
+								{/* Category actions — visible on hover via CSS or always shown */}
+								<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 22, height: 22, fontSize: 10, flexShrink: 0 }}
+									title='Rename' onClick={() => { setEditId(cat.id); setEditName(cat.name) }}>
+									{Icons.edit}
+								</button>
+								<button className='bf-btn bf-btn-ghost bf-btn-icon'
+									style={{ width: 22, height: 22, fontSize: 10, flexShrink: 0, color: cat.isActive ? 'var(--bf-leaf)' : 'var(--bf-mute)', opacity: toggleBusy === cat.id ? 0.5 : 1 }}
+									title={cat.isActive ? 'Deactivate' : 'Activate'}
+									disabled={toggleBusy === cat.id}
+									onClick={() => handleToggleActive(cat)}>
+									{cat.isActive ? '●' : '○'}
+								</button>
+								<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 22, height: 22, fontSize: 10, flexShrink: 0, color: 'var(--bf-ember)' }}
+									title='Delete' onClick={() => { setDeleteError(null); setDeleteTarget({ id: cat.id, name: cat.name, productCount: count }) }}>
+									{Icons.trash}
+								</button>
+							</div>
+						)}
+					</div>
+				)
+			})}
+
+			{/* Add category */}
+			<div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--bf-line)' }}>
+				{addOpen ? (
+					<div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+						<input className='bf-input' value={newName} autoFocus
+							onChange={e => setNewName(e.target.value)}
+							onKeyDown={e => e.key === 'Enter' && handleAdd()}
+							placeholder='Category name…' style={{ fontSize: 12, height: 34 }} />
+						{addError && <p style={{ fontSize: 11, color: 'var(--bf-ember)', fontWeight: 600, margin: 0 }}>{addError}</p>}
+						<div style={{ display: 'flex', gap: 6 }}>
+							<button className='bf-btn bf-btn-outline bf-btn-sm' style={{ flex: 1 }} onClick={() => { setAddOpen(false); setAddError(null) }}>Cancel</button>
+							<button className='bf-btn bf-btn-primary bf-btn-sm' style={{ flex: 1 }} disabled={adding} onClick={handleAdd}>
+								{adding ? 'Adding…' : 'Add'}
+							</button>
+						</div>
+					</div>
+				) : (
+					<button className='bf-btn bf-btn-outline bf-btn-sm' style={{ width: '100%' }} onClick={() => { setAddOpen(true); setAddError(null) }}>
+						{Icons.plus} Add category
+					</button>
+				)}
+			</div>
+
+			{/* Sub-category manager for active category */}
+			{(() => {
+				const activeCatObj = allCats.find(c => c.name === activeCat)
+				return activeCatObj ? <SubCategoryManager categoryId={activeCatObj.id} categoryName={activeCatObj.name} /> : null
+			})()}
+
+			{/* Category delete confirm */}
+			{deleteTarget && (
+				<ConfirmDialog
+					title={`Delete "${deleteTarget.name}"?`}
+					body={deleteTarget.productCount > 0
+						? <><strong style={{ color: 'var(--bf-ember)' }}>{deleteTarget.productCount} product(s)</strong> are in this category. Remove or reassign them before deleting.{deleteError && <><br /><span style={{ color: 'var(--bf-ember)' }}>{deleteError}</span></>}</>
+						: <>{`The category will be permanently removed.`}{deleteError && <><br /><span style={{ color: 'var(--bf-ember)' }}>{deleteError}</span></>}</>}
+					confirmLabel='Delete'
+					danger
+					busy={deleting}
+					onConfirm={handleDelete}
+					onCancel={() => { setDeleteTarget(null); setDeleteError(null) }}
+				/>
+			)}
+		</div>
+	)
+}
+
+// ─── Sort options ─────────────────────────────────────────────────────────────
+type SortKey = 'newest' | 'oldest' | 'az' | 'za' | 'price_asc' | 'price_desc' | 'available'
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+	{ key: 'newest', label: 'Newest first' },
+	{ key: 'oldest', label: 'Oldest first' },
+	{ key: 'az', label: 'Name A → Z' },
+	{ key: 'za', label: 'Name Z → A' },
+	{ key: 'price_asc', label: 'Price: low → high' },
+	{ key: 'price_desc', label: 'Price: high → low' },
+	{ key: 'available', label: 'Available first' },
+]
+
+function sortProducts(list: Product[], key: SortKey): Product[] {
+	return [...list].sort((a, b) => {
+		switch (key) {
+			case 'newest': return b.id - a.id
+			case 'oldest': return a.id - b.id
+			case 'az': return a.name.localeCompare(b.name)
+			case 'za': return b.name.localeCompare(a.name)
+			case 'price_asc': return a.price - b.price
+			case 'price_desc': return b.price - a.price
+			case 'available': return (b.isAvailable ? 1 : 0) - (a.isAvailable ? 1 : 0)
+			default: return 0
+		}
+	})
 }
 
 // ─── Menu Catalog ─────────────────────────────────────────────────────────────
 export function AdminMenu() {
 	const { data: products, isLoading, error, mutate } = useProducts()
-	const { data: categoriesData, isLoading: categoriesLoading, mutate: refreshCategories } = useCategories()
+	const { data: categoriesData, isLoading: categoriesLoading } = useCategories()
 	const [selectedCat, setSelectedCat] = useState<string | null>(null)
 	const [modal, setModal] = useState<'add' | Product | null>(null)
 	const [deleteId, setDeleteId] = useState<number | null>(null)
 	const [deleting, setDeleting] = useState(false)
+	const [searchQuery, setSearchQuery] = useState('')
+	const [sortKey, setSortKey] = useState<SortKey>('newest')
 
-	const categories = useMemo(() =>
-		(categoriesData ?? [])
-			.filter(c => c.isActive)
-			.slice()
-			.sort((a, b) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999) || a.name.localeCompare(b.name)),
+	// All categories (including inactive) for the sidebar manager; active-only for product filtering
+	const allCategories = useMemo(() =>
+		(categoriesData ?? []).slice().sort((a, b) => (a.displayOrder ?? 999) - (b.displayOrder ?? 999) || a.name.localeCompare(b.name)),
 		[categoriesData])
 
-	const activeCat = selectedCat ?? categories[0]?.name ?? null
+	const activeCategories = useMemo(() => allCategories.filter(c => c.isActive), [allCategories])
 
-	const filteredProducts = useMemo(
-		() => (products ?? []).filter(p => p.category === activeCat),
-		[products, activeCat],
-	)
+	const activeCat = selectedCat ?? activeCategories[0]?.name ?? null
+
+	const filteredProducts = useMemo(() => {
+		const byCat = (products ?? []).filter(p => p.category === activeCat)
+		const q = searchQuery.trim().toLowerCase()
+		const searched = q
+			? byCat.filter(p =>
+				p.name.toLowerCase().includes(q) ||
+				p.category.toLowerCase().includes(q) ||
+				(p.description ?? '').toLowerCase().includes(q) ||
+				(p.subCategoryName ?? '').toLowerCase().includes(q)
+			)
+			: byCat
+		return sortProducts(searched, sortKey)
+	}, [products, activeCat, searchQuery, sortKey])
 
 	async function handleCategoryCreate(name: string) {
 		const cat = await createCategory({ name })
-		await refreshCategories()
 		setSelectedCat(cat.name)
 		return cat
 	}
@@ -907,7 +1390,7 @@ export function AdminMenu() {
 				sub={
 					isLoading || categoriesLoading
 						? 'Loading…'
-						: `${itemCount} ITEMS · ${categories.length} CATEGORIES`
+						: `${itemCount} ITEMS · ${allCategories.length} CATEGORIES`
 				}
 			/>
 
@@ -918,57 +1401,103 @@ export function AdminMenu() {
 					<select
 						className='bf-input'
 						value={activeCat ?? ''}
-						onChange={e => setSelectedCat(e.target.value || null)}
+						onChange={e => { setSelectedCat(e.target.value || null); setSearchQuery('') }}
 					>
-						{categories.map(cat => (
+						{activeCategories.map(cat => (
 							<option key={cat.name} value={cat.name}>{cat.name}</option>
 						))}
 					</select>
 				</div>
 
 				{/* Category sidebar (desktop/tablet) */}
-				<div className='bf-card bf-admin-cat-sidebar' style={{ padding: 12, height: 'fit-content' }}>
-					<div className='bf-eyebrow' style={{ padding: '6px 10px 10px' }}>CATEGORIES</div>
-					{isLoading || categoriesLoading ? (
-						<div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 0' }}>
-							{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} h={34} r={8} />)}
-						</div>
-					) : categories.length === 0 ? (
-						<p style={{ fontSize: 12, color: 'var(--bf-mute)', padding: '4px 10px' }}>No categories yet</p>
-					) : (
-						categories.map(cat => {
-							const count = (products ?? []).filter(p => p.category === cat.name).length
-							return (
-								<button
-									key={cat.name}
-									onClick={() => setSelectedCat(cat.name)}
-									className={`bf-sidebar-item${activeCat === cat.name ? ' bf-sidebar-item--active' : ''}`}
-									style={{
-										display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-										width: '100%', padding: '9px 10px', border: 0,
-										background: activeCat === cat.name ? 'var(--bf-cream-2)' : 'transparent',
-										borderRadius: 8, cursor: 'pointer',
-										font: '600 13px var(--bf-font)', textAlign: 'left', color: 'var(--bf-ink)',
-									}}
-								>
-									<span>{cat.name}</span>
-									<span className='bf-mono' style={{ fontSize: 11, color: 'var(--bf-mute)' }}>{count}</span>
-								</button>
-							)
-						})
-					)}
-				</div>
+				<CategorySidebar
+					categories={allCategories}
+					activeCat={activeCat}
+					onSelect={name => { setSelectedCat(name); setSearchQuery('') }}
+					onCreated={cat => { setSelectedCat(cat.name); setSearchQuery('') }}
+					products={products}
+					isLoading={isLoading || categoriesLoading}
+				/>
 
 				{/* Items table */}
 				<div className='bf-card' style={{ padding: 0, overflow: 'hidden' }}>
-					<div style={{ padding: '16px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--bf-line)', gap: 12, flexWrap: 'wrap' }}>
-						<h2 style={{ fontWeight: 700, fontSize: 18, margin: 0 }}>
-							{activeCat ?? 'All items'} ·{' '}
-							<span className='bf-mono' style={{ fontWeight: 400, fontSize: 14 }}>{filteredProducts.length} items</span>
-						</h2>
-						<button className='bf-btn bf-btn-primary bf-btn-sm' onClick={() => setModal('add')}>
-							{Icons.plus} Add item
-						</button>
+					<div style={{ padding: '14px 22px', borderBottom: '1px solid var(--bf-line)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+						{/* Row 1: title + add */}
+						<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+							<h2 style={{ fontWeight: 700, fontSize: 18, margin: 0 }}>
+								{activeCat ?? 'All items'} ·{' '}
+								<span className='bf-mono' style={{ fontWeight: 400, fontSize: 14 }}>
+									{filteredProducts.length}{searchQuery.trim() ? ` of ${(products ?? []).filter(p => p.category === activeCat).length}` : ''} items
+								</span>
+							</h2>
+							<button className='bf-btn bf-btn-primary bf-btn-sm' onClick={() => setModal('add')}>
+								{Icons.plus} Add item
+							</button>
+						</div>
+
+						{/* Row 2: search + sort */}
+						<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+							{/* Search */}
+							<div style={{ position: 'relative', flex: '1 1 180px', minWidth: 0 }}>
+								<span style={{
+									position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)',
+									color: 'var(--bf-mute)', fontSize: 14, pointerEvents: 'none', lineHeight: 1,
+								}}>
+									<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
+										<circle cx='11' cy='11' r='8' /><path d='M21 21l-4.35-4.35' />
+									</svg>
+								</span>
+								<input
+									className='bf-input'
+									value={searchQuery}
+									onChange={e => setSearchQuery(e.target.value)}
+									placeholder='Search items…'
+									style={{ paddingLeft: 34, paddingRight: searchQuery ? 32 : 12, fontSize: 13, height: 38 }}
+								/>
+								{searchQuery && (
+									<button
+										onClick={() => setSearchQuery('')}
+										style={{
+											position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+											width: 20, height: 20, borderRadius: '50%', border: 'none',
+											background: 'var(--bf-line-2)', color: 'var(--bf-mute)',
+											cursor: 'pointer', fontSize: 11, display: 'grid', placeItems: 'center',
+											lineHeight: 1,
+										}}
+										title='Clear search'
+									>✕</button>
+								)}
+							</div>
+
+							{/* Sort */}
+							<div style={{ position: 'relative', flexShrink: 0 }}>
+								<span style={{
+									position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+									color: 'var(--bf-mute)', fontSize: 12, pointerEvents: 'none', lineHeight: 1,
+								}}>
+									<svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round'>
+										<path d='M3 6h18M7 12h10M11 18h2' />
+									</svg>
+								</span>
+								<select
+									className='bf-input'
+									value={sortKey}
+									onChange={e => setSortKey(e.target.value as SortKey)}
+									style={{ paddingLeft: 28, paddingRight: 28, fontSize: 12, height: 38, minWidth: 148, cursor: 'pointer' }}
+								>
+									{SORT_OPTIONS.map(o => (
+										<option key={o.key} value={o.key}>{o.label}</option>
+									))}
+								</select>
+							</div>
+						</div>
+
+						{/* No search results hint */}
+						{searchQuery.trim() && filteredProducts.length === 0 && !isLoading && (
+							<div style={{ fontSize: 12, color: 'var(--bf-mute)', fontStyle: 'italic' }}>
+								No items match &ldquo;{searchQuery.trim()}&rdquo;
+							</div>
+						)}
 					</div>
 
 					{/* Scrollable table */}
@@ -1071,7 +1600,12 @@ export function AdminMenu() {
 													{it.hasSizes && <span style={{ color: 'var(--bf-ink-2)' }}>SIZES</span>}
 												</div>
 											</div>
-											<span style={{ fontSize: 13, color: 'var(--bf-ink-2)' }}>{it.category}</span>
+											<div>
+												<div style={{ fontSize: 13, color: 'var(--bf-ink-2)' }}>{it.category}</div>
+												{it.subCategoryName && (
+													<div style={{ fontSize: 10, color: 'var(--bf-mute)', marginTop: 2, fontWeight: 600 }}>{it.subCategoryName}</div>
+												)}
+											</div>
 											<div>
 												<div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
 													{hasDis && (
@@ -1117,7 +1651,7 @@ export function AdminMenu() {
 				<ProductModal
 					mode={modal === 'add' ? 'add' : 'edit'}
 					product={modal === 'add' ? null : modal}
-					categories={categories}
+					categories={activeCategories}
 					onClose={() => setModal(null)}
 					onSaved={async () => { await mutate(); setModal(null) }}
 					onCategoryCreate={handleCategoryCreate}

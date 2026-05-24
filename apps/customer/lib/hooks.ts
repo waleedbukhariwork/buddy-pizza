@@ -10,6 +10,8 @@ export interface Product {
 	price: number
 	categoryId?: number | null
 	category: string
+	subCategoryId?: number | null
+	subCategoryName?: string | null
 	imageUrl?: string | null
 	isAvailable: boolean
 	isHot?: boolean

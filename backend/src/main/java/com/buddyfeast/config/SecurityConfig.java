@@ -1,10 +1,14 @@
 package com.buddyfeast.config;
 
+import com.buddyfeast.exception.ErrorResponse;
 import com.buddyfeast.security.JwtAuthenticationFilter;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -13,6 +17,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.time.Instant;
 import java.util.Arrays;
 
 @Configuration
@@ -21,6 +26,9 @@ public class SecurityConfig {
     
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
@@ -50,6 +58,34 @@ public class SecurityConfig {
                 .requestMatchers("/v1/cart/**").hasAuthority("CUSTOMER")
                 .requestMatchers("/v1/users/**").hasAuthority("CUSTOMER")
                 .anyRequest().authenticated()
+            )
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    ErrorResponse body = ErrorResponse.builder()
+                            .success(false)
+                            .status(401)
+                            .message("Authentication required")
+                            .errorCode("UNAUTHENTICATED")
+                            .timestamp(Instant.now())
+                            .path(request.getRequestURI())
+                            .build();
+                    response.getWriter().write(objectMapper.writeValueAsString(body));
+                })
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    ErrorResponse body = ErrorResponse.builder()
+                            .success(false)
+                            .status(403)
+                            .message("Access denied")
+                            .errorCode("ACCESS_DENIED")
+                            .timestamp(Instant.now())
+                            .path(request.getRequestURI())
+                            .build();
+                    response.getWriter().write(objectMapper.writeValueAsString(body));
+                })
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         

@@ -50,6 +50,16 @@ export interface DashboardMetrics {
 	sparklineData: number[]
 }
 
+export interface SubCategory {
+	id: number
+	name: string
+	displayOrder?: number | null
+	isActive: boolean
+	categoryId?: number | null
+	categoryName?: string | null
+	productCount?: number
+}
+
 export interface Product {
 	id: number
 	name: string
@@ -57,6 +67,8 @@ export interface Product {
 	price: number
 	categoryId?: number | null
 	category: string
+	subCategoryId?: number | null
+	subCategoryName?: string | null
 	imageUrl?: string | null
 	isAvailable: boolean
 	isHot?: boolean

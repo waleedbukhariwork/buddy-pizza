@@ -2,10 +2,12 @@ package com.buddyfeast.controller;
 
 import com.buddyfeast.entity.Order;
 import com.buddyfeast.entity.Rider;
+import com.buddyfeast.exception.AppException;
 import com.buddyfeast.repository.OrderRepository;
 import com.buddyfeast.service.OrderService;
 import com.buddyfeast.service.RiderService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -40,7 +42,8 @@ public class RiderController {
 
     @GetMapping("/orders/{orderId}")
     public ResponseEntity<Order> getRiderOrderById(@PathVariable Long orderId) {
-        return ResponseEntity.ok(orderRepository.findById(orderId).orElseThrow());
+        return ResponseEntity.ok(orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Order not found")));
     }
     
     @PutMapping("/orders/{orderId}/status")

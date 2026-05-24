@@ -91,6 +91,27 @@ function MenuCategorySection({ section, view, si }: { section: { category: Categ
 		return () => io.disconnect()
 	}, [])
 
+	// Group by sub-category; ungrouped products go under null key
+	const groups = useMemo(() => {
+		const map = new Map<string | null, Product[]>()
+		for (const item of items) {
+			const key = item.subCategoryName ?? null
+			if (!map.has(key)) map.set(key, [])
+			map.get(key)!.push(item)
+		}
+		// Ungrouped first, then named groups alphabetically
+		const named = [...map.entries()].filter(([k]) => k !== null).sort((a, b) => (a[0] as string).localeCompare(b[0] as string))
+		const ungrouped = map.get(null)
+		const result: { label: string | null; products: Product[] }[] = []
+		if (ungrouped) result.push({ label: null, products: ungrouped })
+		for (const [label, products] of named) result.push({ label, products })
+		return result
+	}, [items])
+
+	const hasGroups = groups.some(g => g.label !== null)
+
+	let runningIdx = 0
+
 	return (
 		<section
 			ref={ref as React.RefObject<HTMLElement>}
@@ -104,19 +125,42 @@ function MenuCategorySection({ section, view, si }: { section: { category: Categ
 					{items.length}
 				</span>
 			</h2>
-			{view === 'list' ? (
-				<div className='bf-menu-products-list'>
-					{items.map((it, i) => (
-						<FoodCard key={it.id} item={it} variant='list' tone={TONES[(si + i) % 3]} />
-					))}
-				</div>
-			) : (
-				<div className='bf-menu-products-grid'>
-					{items.map((it, i) => (
-						<FoodCard key={it.id} item={it} variant='grid' tone={TONES[(si + i) % 3]} />
-					))}
-				</div>
-			)}
+
+			{groups.map(({ label, products }) => {
+				const startIdx = runningIdx
+				runningIdx += products.length
+				return (
+					<div key={label ?? '__ungrouped'}>
+						{hasGroups && label && (
+							<div style={{
+								display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 12px',
+							}}>
+								<span style={{
+									font: '700 11px var(--bf-mono)', letterSpacing: '.1em',
+									textTransform: 'uppercase', color: 'var(--bf-ink-2)',
+								}}>
+									{label}
+								</span>
+								<div style={{ flex: 1, height: 1, background: 'var(--bf-line)' }} />
+								<span className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)' }}>{products.length}</span>
+							</div>
+						)}
+						{view === 'list' ? (
+							<div className='bf-menu-products-list'>
+								{products.map((it, i) => (
+									<FoodCard key={it.id} item={it} variant='list' tone={TONES[(si + startIdx + i) % 3]} />
+								))}
+							</div>
+						) : (
+							<div className='bf-menu-products-grid'>
+								{products.map((it, i) => (
+									<FoodCard key={it.id} item={it} variant='grid' tone={TONES[(si + startIdx + i) % 3]} />
+								))}
+							</div>
+						)}
+					</div>
+				)
+			})}
 		</section>
 	)
 }

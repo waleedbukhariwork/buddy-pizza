@@ -29,4 +29,6 @@ public class ProductDTO {
     private Boolean isAvailable;
     private Boolean isHot;
     private Boolean hasSizes;
+    private Long subCategoryId;
+    private String subCategoryName;
 }

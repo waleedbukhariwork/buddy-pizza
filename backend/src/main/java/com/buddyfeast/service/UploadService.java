@@ -1,8 +1,10 @@
 package com.buddyfeast.service;
 
+import com.buddyfeast.exception.AppException;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -70,16 +72,16 @@ public class UploadService {
 
     private void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("No file provided");
+            throw new AppException(HttpStatus.BAD_REQUEST, "No file provided");
         }
         if (!ALLOWED_TYPES.contains(file.getContentType())) {
-            throw new IllegalArgumentException(
+            throw new AppException(HttpStatus.BAD_REQUEST,
                 "Unsupported file type: " + file.getContentType() +
                 ". Allowed: jpeg, png, webp, gif"
             );
         }
         if (file.getSize() > MAX_BYTES) {
-            throw new IllegalArgumentException("File exceeds the 5 MB limit");
+            throw new AppException(HttpStatus.BAD_REQUEST, "File exceeds the 5 MB limit");
         }
     }
 }

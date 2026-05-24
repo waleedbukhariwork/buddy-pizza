@@ -315,9 +315,13 @@ export default function OrdersPage() {
 						<div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
 						<div style={{ fontWeight: 700, fontSize: 16 }}>Couldn't load your orders</div>
 						<div style={{ fontSize: 13, color: 'var(--bf-ink-2)', marginTop: 6 }}>
-							{error.message?.includes('401') ? 'Please sign in to view your orders.' : 'Something went wrong. Please try again.'}
+							{error.status === 401 || error.message?.includes('401')
+								? 'Please sign in to view your orders.'
+								: error.errorCode === 'ENDPOINT_NOT_FOUND'
+									? 'Route not found.'
+									: 'Something went wrong. Please try again.'}
 						</div>
-						{error.message?.includes('401') ? (
+						{error.status === 401 || error.message?.includes('401') ? (
 							<Link href='/auth/login' className='bf-btn bf-btn-primary bf-btn-sm' style={{ marginTop: 16, display: 'inline-flex' }}>
 								Sign in {Icons.arrow}
 							</Link>

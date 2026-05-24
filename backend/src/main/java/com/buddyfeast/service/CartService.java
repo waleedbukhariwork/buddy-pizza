@@ -4,6 +4,8 @@ import com.buddyfeast.dto.CartDTO;
 import com.buddyfeast.dto.CartItemDTO;
 import com.buddyfeast.entity.Cart;
 import com.buddyfeast.entity.User;
+import com.buddyfeast.exception.AppException;
+import org.springframework.http.HttpStatus;
 import com.buddyfeast.repository.CartRepository;
 import com.buddyfeast.repository.UserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -37,7 +39,7 @@ public class CartService {
 
     public CartDTO syncCart(@NonNull Long userId, List<CartItemDTO> items) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
 
         Cart cart = cartRepository.findByUserId(userId)
             .orElse(Cart.builder().user(user).build());
@@ -47,7 +49,7 @@ public class CartService {
             cart.setItems(objectMapper.writeValueAsString(items));
             return toDTO(cartRepository.save(cart));
         } catch (Exception e) {
-            throw new RuntimeException("Failed to sync cart", e);
+            throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to sync cart");
         }
     }
 
@@ -57,7 +59,7 @@ public class CartService {
                 cart.setItems(objectMapper.writeValueAsString(List.of()));
                 cartRepository.save(cart);
             } catch (Exception e) {
-                throw new RuntimeException("Failed to clear cart", e);
+                throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to clear cart");
             }
         });
     }
