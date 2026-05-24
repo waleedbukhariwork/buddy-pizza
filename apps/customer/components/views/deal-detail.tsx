@@ -56,8 +56,21 @@ function Skel({ h, w, style }: { h: number; w?: number | string; style?: React.C
 // ─── Options Picker Modal ─────────────────────────────────────────────────────
 function getItemGroups(item: ReturnType<typeof parseDealItems>[number]): OptionGroup[] {
 	if (item.options?.length) return item.options
-	if (item.availableFlavors?.length) return [{ label: 'Flavor', type: 'single', required: false, choices: item.availableFlavors }]
+	if (item.availableFlavors?.length) return [{ label: 'Flavor', type: 'single', required: false, choices: item.availableFlavors.map(s => ({ label: s, priceAdjustment: 0 })) }]
 	return []
+}
+
+function totalAdjustment(groups: OptionGroup[], selectedOptions: Record<string, string[]>, itemName: string): number {
+	let total = 0
+	for (const g of groups) {
+		const key = `${itemName}__${g.label}`
+		const sel = selectedOptions[key] ?? []
+		for (const s of sel) {
+			const choice = g.choices.find(c => c.label === s)
+			if (choice) total += choice.priceAdjustment ?? 0
+		}
+	}
+	return total
 }
 
 function OptionsPickerModal({
@@ -80,6 +93,8 @@ function OptionsPickerModal({
 	const allRequiredMet = optionItems.every(item =>
 		getItemGroups(item).every(g => !g.required || (selectedOptions[`${item.name}__${g.label}`]?.length ?? 0) > 0)
 	)
+
+	const totalAdj = optionItems.reduce((sum, item) => sum + totalAdjustment(getItemGroups(item), selectedOptions, item.name), 0)
 
 	return (
 		<div
@@ -122,15 +137,16 @@ function OptionsPickerModal({
 												</div>
 												<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
 													{g.choices.map(choice => {
-														const isSelected = sel.includes(choice)
+														const isSelected = sel.includes(choice.label)
 														return (
 															<button
-																key={choice}
+																key={choice.label}
 																className={`bf-btn bf-btn-sm ${isSelected ? 'bf-btn-primary' : 'bf-btn-outline'}`}
 																style={{ padding: '8px 16px', fontSize: 13, fontWeight: 600 }}
-																onClick={() => onSelect(key, choice, g.type)}
+																onClick={() => onSelect(key, choice.label, g.type)}
 															>
-																{choice}
+																{choice.label}
+																{choice.priceAdjustment ? <span style={{ marginLeft: 4, fontSize: 10, opacity: 0.8 }}>+Rs.{choice.priceAdjustment}</span> : null}
 															</button>
 														)
 													})}
@@ -145,16 +161,23 @@ function OptionsPickerModal({
 				</div>
 
 				{/* Footer */}
-				<div style={{ padding: '16px 24px', borderTop: '1px solid var(--bf-line)', display: 'flex', gap: 10, flexShrink: 0 }}>
-					<button className='bf-btn bf-btn-outline bf-btn-md' style={{ flex: 1 }} onClick={onClose}>Cancel</button>
-					<button
-						className='bf-btn bf-btn-primary bf-btn-md'
-						style={{ flex: 2, opacity: allRequiredMet ? 1 : 0.5 }}
-						disabled={!allRequiredMet}
-						onClick={onConfirm}
-					>
-						Add to cart · {rs(dealPrice * qty)}
-					</button>
+				<div style={{ padding: '16px 24px', borderTop: '1px solid var(--bf-line)', display: 'flex', flexDirection: 'column', gap: 10, flexShrink: 0 }}>
+					{totalAdj > 0 && (
+						<div style={{ fontSize: 11, color: 'var(--bf-mute)', textAlign: 'center' }}>
+							Option adjustments: <strong>+Rs.{totalAdj.toLocaleString('en-PK')}</strong>
+						</div>
+					)}
+					<div style={{ display: 'flex', gap: 10 }}>
+						<button className='bf-btn bf-btn-outline bf-btn-md' style={{ flex: 1 }} onClick={onClose}>Cancel</button>
+						<button
+							className='bf-btn bf-btn-primary bf-btn-md'
+							style={{ flex: 2, opacity: allRequiredMet ? 1 : 0.5 }}
+							disabled={!allRequiredMet}
+							onClick={onConfirm}
+						>
+							Add to cart · {rs(dealPrice * qty)}
+						</button>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -424,11 +447,11 @@ function DealDetailPage({ dealId }: { dealId: number }) {
 																		{g.label} {g.type === 'single' ? '— choose one' : '— choose any'}
 																	</div>
 																	<div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-																		{g.choices.map(c => (
-																			<span key={c} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: 'rgba(232,67,31,.08)', color: 'var(--bf-ember)' }}>
-																				{c}
-																			</span>
-																		))}
+{g.choices.map(c => (
+																		<span key={c.label} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: 'rgba(232,67,31,.08)', color: 'var(--bf-ember)' }}>
+																			{c.label}{c.priceAdjustment ? <span style={{ marginLeft: 2, opacity: 0.7 }}>+Rs.{c.priceAdjustment}</span> : null}
+																		</span>
+																	))}
 																	</div>
 																</div>
 															))}

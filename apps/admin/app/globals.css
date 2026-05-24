@@ -67,6 +67,9 @@ a { color: inherit; text-decoration: none; }
 
 .bf-input { font-family: var(--bf-font); font-size: 14px; background: var(--bf-paper); color: var(--bf-ink); border: 1px solid var(--bf-line-2); border-radius: 12px; padding: 12px 14px; outline: none; width: 100%; transition: border-color .15s, box-shadow .15s; }
 .bf-input:focus { border-color: var(--bf-ink); box-shadow: 0 0 0 3px rgba(35,31,32,.08); }
+.bf-input::-webkit-inner-spin-button,
+.bf-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.bf-input[type='number'] { -moz-appearance: textfield; }
 .bf-label { font-size: 11.5px; font-weight: 600; color: var(--bf-ink-2); margin-bottom: 6px; letter-spacing: -0.01em; display: block; }
 .bf-req { color: #E8431F; margin-left: 2px; font-weight: 700; }
 .bf-opt { color: var(--bf-mute); font-weight: 400; margin-left: 4px; font-size: 10.5px; }

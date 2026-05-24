@@ -9,36 +9,48 @@ import { ImageUploader } from '../ui/image-uploader'
 import type { Deal, Product } from '../../lib/types'
 
 // ─── Option group model ───────────────────────────────────────────────────────
+interface OptionChoice {
+	label: string
+	priceAdjustment: number
+}
+
 interface OptionGroup {
 	label: string
 	type: 'single' | 'multi'
 	required: boolean
-	choices: string[]
+	choices: OptionChoice[]
 }
 
-const LABEL_SUGGESTIONS: Record<string, string[]> = {
-	size:     ['Small', 'Medium', 'Large', 'Regular', 'Family', 'Personal'],
-	flavor:   ['Peri Peri', 'BBQ', 'Tikka', 'Garlic', 'Original', 'Cheese'],
-	serving:  ['Half', 'Full', 'Single', 'Combo'],
-	quantity: ['6 pcs', '10 pcs', '12 pcs', 'Family Pack'],
-	sauce:    ['Ketchup', 'Mayo', 'Ranch', 'Sriracha', 'BBQ'],
-	crust:    ['Thin', 'Regular', 'Thick', 'Stuffed'],
-}
-
-const QUICK_START_GROUPS: OptionGroup[] = [
-	{ label: 'Size',          type: 'single', required: true,  choices: ['Small', 'Medium', 'Large'] },
-	{ label: 'Flavor',        type: 'single', required: false, choices: ['Peri Peri', 'BBQ', 'Tikka'] },
-	{ label: 'Serving Style', type: 'single', required: true,  choices: ['Half', 'Full'] },
-	{ label: 'Quantity',      type: 'single', required: true,  choices: ['6 pcs', '10 pcs', '12 pcs'] },
+const LABEL_SUGGESTIONS: string[][] = [
+	['Small', 'Medium', 'Large', 'Regular', 'Family', 'Personal'],
+	['Peri Peri', 'BBQ', 'Tikka', 'Garlic', 'Original', 'Cheese'],
+	['Half', 'Full', 'Single', 'Combo'],
+	['6 pcs', '10 pcs', '12 pcs', 'Family Pack'],
+	['Ketchup', 'Mayo', 'Ranch', 'Sriracha', 'BBQ'],
+	['Thin', 'Regular', 'Thick', 'Stuffed'],
 ]
 
 function getSuggestions(label: string): string[] {
 	const lc = label.toLowerCase()
-	for (const [key, suggestions] of Object.entries(LABEL_SUGGESTIONS)) {
-		if (lc.includes(key)) return suggestions
-	}
+	if (lc.includes('size')) return LABEL_SUGGESTIONS[0]
+	if (lc.includes('flavor')) return LABEL_SUGGESTIONS[1]
+	if (lc.includes('serving')) return LABEL_SUGGESTIONS[2]
+	if (lc.includes('quantity') || lc.includes('pcs') || lc.includes('pack')) return LABEL_SUGGESTIONS[3]
+	if (lc.includes('sauce')) return LABEL_SUGGESTIONS[4]
+	if (lc.includes('crust')) return LABEL_SUGGESTIONS[5]
 	return []
 }
+
+function toOptionChoices(strings: string[], adjustments?: number[]): OptionChoice[] {
+	return strings.map((label, i) => ({ label, priceAdjustment: adjustments?.[i] ?? 0 }))
+}
+
+const QUICK_START_GROUPS: OptionGroup[] = [
+	{ label: 'Size',          type: 'single', required: true,  choices: toOptionChoices(['Small', 'Medium', 'Large']) },
+	{ label: 'Flavor',        type: 'single', required: false, choices: toOptionChoices(['Peri Peri', 'BBQ', 'Tikka']) },
+	{ label: 'Serving Style', type: 'single', required: true,  choices: toOptionChoices(['Half', 'Full']) },
+	{ label: 'Quantity',      type: 'single', required: true,  choices: toOptionChoices(['6 pcs', '10 pcs', '12 pcs']) },
+]
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SelectedItem {
@@ -47,6 +59,27 @@ interface SelectedItem {
 	unitPrice: number
 	qty: number
 	options: OptionGroup[]
+}
+
+// ─── Migration helper: convert legacy string[] choices to OptionChoice[] ────
+function migrateChoices(raw: unknown): OptionChoice[] {
+	if (Array.isArray(raw)) {
+		if (raw.length === 0) return []
+		if (typeof raw[0] === 'string') return (raw as string[]).map(s => ({ label: s, priceAdjustment: 0 }))
+		if (typeof raw[0] === 'object' && raw[0] !== null && 'label' in (raw[0] as any)) {
+			return (raw as any[]).map(c => ({ label: c.label ?? '', priceAdjustment: c.priceAdjustment ?? 0 }))
+		}
+	}
+	return []
+}
+
+function migrateOptionGroup(g: any): OptionGroup {
+	return {
+		label: g.label ?? '',
+		type: (g.type === 'multi' ? 'multi' : 'single') as 'single' | 'multi',
+		required: !!g.required,
+		choices: migrateChoices(g.choices),
+	}
 }
 
 // ─── Serialization (JSON format, backward-compat parse) ───────────────────────
@@ -68,14 +101,14 @@ function parseToSelected(raw: string | null | undefined, _products: Product[]): 
 		try {
 			const parsed = JSON.parse(raw) as Array<{
 				productId?: number | null; name: string; qty: number; unitPrice: number
-				options?: OptionGroup[]; size?: string | null; availableFlavors?: string[]
+				options?: any[]; size?: string | null; availableFlavors?: string[]
 			}>
 			return parsed.map(item => {
-				let options: OptionGroup[] = item.options?.length ? item.options : []
+				let options: OptionGroup[] = item.options?.length ? item.options.map(migrateOptionGroup) : []
 				// Migrate legacy size + availableFlavors to option groups
 				if (!options.length) {
-					if (item.size) options = [...options, { label: 'Size', type: 'single', required: true, choices: [item.size] }]
-					if (item.availableFlavors?.length) options = [...options, { label: 'Flavor', type: 'single', required: false, choices: item.availableFlavors }]
+					if (item.size) options = [...options, { label: 'Size', type: 'single', required: true, choices: [{ label: item.size, priceAdjustment: 0 }] }]
+					if (item.availableFlavors?.length) options = [...options, { label: 'Flavor', type: 'single', required: false, choices: item.availableFlavors.map(s => ({ label: s, priceAdjustment: 0 })) }]
 				}
 				return { productId: item.productId ?? undefined, name: item.name, qty: item.qty, unitPrice: item.unitPrice, options }
 			})
@@ -93,6 +126,16 @@ function parseToSelected(raw: string | null | undefined, _products: Product[]): 
 
 function calcOriginal(items: SelectedItem[]) {
 	return items.reduce((s, i) => s + i.unitPrice * i.qty, 0)
+}
+
+function calcOriginalMax(items: SelectedItem[]) {
+	return items.reduce((s, i) => {
+		const maxAdj = i.options.reduce((a, g) => {
+			const max = g.choices.reduce((m, c) => Math.max(m, c.priceAdjustment ?? 0), 0)
+			return a + max
+		}, 0)
+		return s + (i.unitPrice + maxAdj) * i.qty
+	}, 0)
 }
 
 interface SavingsInfo { amount: number; pct: number }
@@ -150,6 +193,94 @@ function Toggle({ on, onChange, color = 'var(--bf-ember)' }: { on: boolean; onCh
 	)
 }
 
+// ─── Size selector modal ──────────────────────────────────────────────────────
+function SizeSelectorModal({ product, onAdd, onCancel }: {
+	product: Product
+	onAdd: (item: SelectedItem) => void
+	onCancel: () => void
+}) {
+	const sizes: { label: string; price: number }[] = []
+	if (product.sizesJson) {
+		try {
+			const parsed = JSON.parse(product.sizesJson) as { name: string; price: number }[]
+			for (const s of parsed) sizes.push({ label: s.name, price: s.price })
+		} catch { /* fall through */ }
+	}
+	if (!sizes.length) {
+		if (product.priceSmall) sizes.push({ label: product.labelSmall ?? 'Small', price: product.priceSmall })
+		if (product.priceMedium) sizes.push({ label: product.labelMedium ?? 'Medium', price: product.priceMedium })
+		if (product.priceLarge) sizes.push({ label: product.labelLarge ?? 'Large', price: product.priceLarge })
+	}
+	if (!sizes.length) sizes.push({ label: 'Regular', price: product.price })
+
+	const [selectedIdx, setSelectedIdx] = useState(0)
+	const selected = sizes[selectedIdx]
+
+	function confirm() {
+		const choices: OptionChoice[] = sizes.map(s => ({
+			label: s.label,
+			priceAdjustment: Math.round(s.price - selected.price),
+		}))
+		const options: OptionGroup[] = [{
+			label: 'Size',
+			type: 'single',
+			required: true,
+			choices,
+		}]
+		onAdd({ productId: product.id, name: product.name, unitPrice: selected.price, qty: 1, options })
+	}
+
+	return (
+		<div style={{ position: 'fixed', inset: 0, background: 'rgba(35,31,32,.45)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center', zIndex: 300 }} onClick={onCancel}>
+			<div className='bf-card' style={{ maxWidth: 400, width: '92%', padding: 0, borderRadius: 18, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+				<div style={{ padding: '20px 22px 14px', borderBottom: '1px solid var(--bf-line)' }}>
+					<div className='bf-eyebrow' style={{ marginBottom: 4 }}>CHOOSE SIZE</div>
+					<h3 style={{ fontWeight: 800, fontSize: 17, margin: 0 }}>{product.name}</h3>
+					<p style={{ fontSize: 12, color: 'var(--bf-mute)', marginTop: 4 }}>Select which size sets the base price for this deal</p>
+				</div>
+				<div style={{ padding: '14px 22px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+					{sizes.map((s, i) => {
+						const adj = Math.round(s.price - selected.price)
+						const isSelected = i === selectedIdx
+						return (
+							<div key={i} onClick={() => setSelectedIdx(i)} style={{
+								padding: '12px 14px', borderRadius: 12, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+								border: `1.5px solid ${isSelected ? 'var(--bf-ember)' : 'var(--bf-line)'}`,
+								background: isSelected ? 'rgba(232,67,31,.06)' : 'var(--bf-paper)',
+								transition: 'all .12s',
+							}}>
+								<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+									<div style={{
+										width: 18, height: 18, borderRadius: '50%',
+										border: `2px solid ${isSelected ? 'var(--bf-ember)' : 'var(--bf-line-2)'}`,
+										display: 'grid', placeItems: 'center',
+									}}>
+										{isSelected && <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--bf-ember)' }} />}
+									</div>
+									<span style={{ fontWeight: 700, fontSize: 14 }}>{s.label}</span>
+								</div>
+								<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+									<span className='bf-mono' style={{ fontWeight: 700, fontSize: 14, color: 'var(--bf-ember)' }}>Rs.{s.price.toLocaleString('en-PK')}</span>
+									{adj !== 0 && (
+										<span className='bf-mono' style={{ fontSize: 11, color: adj > 0 ? 'var(--bf-leaf)' : 'var(--bf-mute)' }}>
+											{adj > 0 ? `+Rs.${adj}` : `-Rs.${Math.abs(adj)}`}
+										</span>
+									)}
+									{isSelected && <span style={{ fontSize: 10, fontWeight: 600, color: '#166534', background: '#DCFCE7', padding: '2px 7px', borderRadius: 999 }}>Base</span>}
+								</div>
+							</div>
+						)
+					})}
+				</div>
+				<div style={{ padding: '14px 22px', borderTop: '1px solid var(--bf-line)', display: 'flex', gap: 10 }}>
+					<button className='bf-btn bf-btn-outline bf-btn-md' style={{ flex: 1 }} onClick={onCancel}>Cancel</button>
+					<button className='bf-btn bf-btn-primary bf-btn-md' style={{ flex: 1 }} onClick={confirm}>Add to deal →</button>
+				</div>
+			</div>
+		</div>
+	)
+}
+
 // ─── Product search picker ────────────────────────────────────────────────────
 function ProductPicker({ products, selected, onAdd }: {
 	products: Product[]
@@ -159,6 +290,7 @@ function ProductPicker({ products, selected, onAdd }: {
 	const [query, setQuery] = useState('')
 	const [open, setOpen] = useState(false)
 	const ref = useRef<HTMLDivElement>(null)
+	const [sizePickerFor, setSizePickerFor] = useState<Product | null>(null)
 
 	const grouped = useMemo(() => {
 		const q = query.trim().toLowerCase()
@@ -185,111 +317,243 @@ function ProductPicker({ products, selected, onAdd }: {
 	}, [])
 
 	function handleSelect(p: Product) {
-		const options: OptionGroup[] = []
 		if (p.hasSizes) {
-			const choices: string[] = []
-			if (p.labelSmall || p.priceSmall) choices.push(p.labelSmall ?? 'Small')
-			if (p.labelMedium || p.priceMedium) choices.push(p.labelMedium ?? 'Medium')
-			if (p.labelLarge || p.priceLarge) choices.push(p.labelLarge ?? 'Large')
-			options.push({ label: 'Size', type: 'single', required: true, choices: choices.length ? choices : ['Small', 'Medium', 'Large'] })
+			setSizePickerFor(p)
+			setQuery('')
+			setOpen(false)
+			return
 		}
-		onAdd({ productId: p.id, name: p.name, unitPrice: p.priceSmall ?? p.price, qty: 1, options })
+		onAdd({ productId: p.id, name: p.name, unitPrice: p.price, qty: 1, options: [] })
 		setQuery('')
 		setOpen(false)
 	}
 
+	function handleSizeAdd(item: SelectedItem) {
+		onAdd(item)
+		setSizePickerFor(null)
+	}
+
 	return (
-		<div ref={ref} style={{ position: 'relative' }}>
-			<div style={{ position: 'relative' }}>
-				<span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--bf-mute)', pointerEvents: 'none', display: 'flex' }}>
-					{Icons.search}
+		<>
+			<div ref={ref} style={{ position: 'relative' }}>
+				<div style={{ position: 'relative' }}>
+					<span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--bf-mute)', pointerEvents: 'none', display: 'flex' }}>
+						{Icons.search}
+					</span>
+					<input
+						className='bf-input'
+						value={query}
+						onChange={e => { setQuery(e.target.value); setOpen(true) }}
+						onFocus={() => setOpen(true)}
+						placeholder='Search products to add…'
+						style={{ paddingLeft: 42 }}
+					/>
+				</div>
+				{open && hasResults && (
+					<div style={{
+						position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+						background: 'var(--bf-paper)', border: '1px solid var(--bf-line)',
+						borderRadius: 14, boxShadow: '0 12px 40px rgba(35,31,32,.18)',
+						zIndex: 200, maxHeight: 280, overflowY: 'auto',
+					}} className='bf-scroll'>
+						{Object.entries(grouped).map(([cat, items]) => (
+							<div key={cat}>
+								<div style={{
+									padding: '8px 14px 5px',
+									fontSize: 9.5, fontWeight: 800, letterSpacing: '.1em',
+									color: 'var(--bf-mute)', textTransform: 'uppercase',
+									background: 'var(--bf-cream-2)',
+									borderBottom: '1px solid var(--bf-line)',
+									position: 'sticky', top: 0,
+								}}>
+									{cat} <span style={{ fontWeight: 400, opacity: 0.7 }}>({items.length})</span>
+								</div>
+								{items.map(p => {
+									const isAdded = selected.some(i => i.productId === p.id)
+									const basePrice = p.priceSmall ?? p.price
+									return (
+										<div
+											key={p.id}
+											onClick={() => !isAdded && handleSelect(p)}
+											style={{
+												padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+												cursor: isAdded ? 'default' : 'pointer',
+												opacity: isAdded ? 0.45 : 1,
+												borderBottom: '1px solid var(--bf-line)',
+												transition: 'background .1s',
+											}}
+											onMouseEnter={e => { if (!isAdded) (e.currentTarget as HTMLDivElement).style.background = 'var(--bf-cream-2)' }}
+											onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = '' }}
+										>
+											<div style={{ font: '600 13px var(--bf-font)', color: 'var(--bf-ink)' }}>{p.name}</div>
+											<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+												{p.hasSizes && <span style={{ fontSize: 10, color: 'var(--bf-mute)', fontWeight: 600 }}>sizes</span>}
+												<span className='bf-mono' style={{ fontSize: 12, fontWeight: 700, color: 'var(--bf-ember)' }}>
+													{p.hasSizes ? `From Rs.${basePrice}` : `Rs.${basePrice}`}
+												</span>
+												{isAdded
+													? <span style={{ fontSize: 10, color: '#166534', background: '#DCFCE7', padding: '2px 8px', borderRadius: 999, fontWeight: 600 }}>Added</span>
+													: <span style={{ fontSize: 10, color: 'var(--bf-ember)', background: 'rgba(232,67,31,.1)', padding: '2px 8px', borderRadius: 999, fontWeight: 600 }}>+ Add</span>
+												}
+											</div>
+										</div>
+									)
+								})}
+							</div>
+						))}
+					</div>
+				)}
+			</div>
+			{sizePickerFor && (
+				<SizeSelectorModal
+					product={sizePickerFor}
+					onAdd={handleSizeAdd}
+					onCancel={() => setSizePickerFor(null)}
+				/>
+			)}
+		</>
+	)
+}
+
+// ─── Choice pricing row ───────────────────────────────────────────────────────
+const CHOICE_BORDER_RADIUS = 10
+
+function ChoiceRow({ choice, basePrice, onUpdate, onRemove }: {
+	choice: OptionChoice
+	basePrice?: number
+	onUpdate: (upd: Partial<OptionChoice>) => void
+	onRemove: () => void
+}) {
+	const adj = choice.priceAdjustment ?? 0
+	const total = basePrice != null ? basePrice + adj : null
+	const isBase = basePrice != null && adj === 0
+	const isUpcharge = adj > 0
+	const isDiscount = adj < 0
+
+	const borderColor = isBase ? 'rgba(99,102,241,.3)' : isUpcharge ? 'rgba(47,143,78,.25)' : isDiscount ? 'rgba(232,67,31,.22)' : 'var(--bf-line-2)'
+	const bgColor = isBase ? 'rgba(99,102,241,.04)' : isUpcharge ? 'rgba(47,143,78,.04)' : isDiscount ? 'rgba(232,67,31,.04)' : 'var(--bf-paper)'
+
+	return (
+		<div style={{
+			display: 'flex', alignItems: 'center', gap: 10,
+			padding: '10px 12px 10px 14px',
+			background: bgColor,
+			border: `1px solid ${borderColor}`,
+			borderRadius: CHOICE_BORDER_RADIUS,
+			transition: 'all .12s',
+		}}>
+			{/* Label input */}
+			<input
+				className='bf-input'
+				value={choice.label}
+				onChange={e => onUpdate({ label: e.target.value })}
+				style={{
+					flex: '1 1 0', minWidth: 70,
+					height: 34, fontSize: 13, fontWeight: 600,
+					border: 'none', background: 'transparent',
+					padding: '0 4px',
+				}}
+				placeholder='e.g. Large'
+			/>
+
+			{/* Base badge */}
+			{isBase && basePrice != null && (
+				<span style={{
+					fontSize: 10, fontWeight: 800, whiteSpace: 'nowrap',
+					color: '#4338ca', background: 'rgba(99,102,241,.12)',
+					padding: '3px 9px', borderRadius: 7, letterSpacing: '.02em',
+				}}>Base</span>
+			)}
+
+			{/* Adjustment input */}
+			<div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+				<span className='bf-mono' style={{
+					fontSize: 12, fontWeight: 700,
+					color: isUpcharge ? '#15803d' : isDiscount ? '#dc2626' : 'var(--bf-mute)',
+				}}>
+					{isUpcharge ? '+' : isDiscount ? '−' : '±'}Rs.
 				</span>
 				<input
-					className='bf-input'
-					value={query}
-					onChange={e => { setQuery(e.target.value); setOpen(true) }}
-					onFocus={() => setOpen(true)}
-					placeholder='Search products to add…'
-					style={{ paddingLeft: 42 }}
+					className='bf-input bf-mono'
+					type='number'
+					value={adj || ''}
+					onChange={e => onUpdate({ priceAdjustment: e.target.value ? parseFloat(e.target.value) : 0 })}
+					style={{
+						width: 82, height: 34, fontSize: 13, fontWeight: 700, textAlign: 'right',
+						border: `1.5px solid ${borderColor}`,
+						background: bgColor,
+						paddingRight: 8,
+					}}
+					placeholder='0'
 				/>
 			</div>
-			{open && hasResults && (
-				<div style={{
-					position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
-					background: 'var(--bf-paper)', border: '1px solid var(--bf-line)',
-					borderRadius: 14, boxShadow: '0 12px 40px rgba(35,31,32,.18)',
-					zIndex: 200, maxHeight: 280, overflowY: 'auto',
-				}} className='bf-scroll'>
-					{Object.entries(grouped).map(([cat, items]) => (
-						<div key={cat}>
-							<div style={{
-								padding: '8px 14px 5px',
-								fontSize: 9.5, fontWeight: 800, letterSpacing: '.1em',
-								color: 'var(--bf-mute)', textTransform: 'uppercase',
-								background: 'var(--bf-cream-2)',
-								borderBottom: '1px solid var(--bf-line)',
-								position: 'sticky', top: 0,
-							}}>
-								{cat} <span style={{ fontWeight: 400, opacity: 0.7 }}>({items.length})</span>
-							</div>
-							{items.map(p => {
-								const isAdded = selected.some(i => i.productId === p.id)
-								const basePrice = p.priceSmall ?? p.price
-								return (
-									<div
-										key={p.id}
-										onClick={() => !isAdded && handleSelect(p)}
-										style={{
-											padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-											cursor: isAdded ? 'default' : 'pointer',
-											opacity: isAdded ? 0.45 : 1,
-											borderBottom: '1px solid var(--bf-line)',
-											transition: 'background .1s',
-										}}
-										onMouseEnter={e => { if (!isAdded) (e.currentTarget as HTMLDivElement).style.background = 'var(--bf-cream-2)' }}
-										onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = '' }}
-									>
-										<div style={{ font: '600 13px var(--bf-font)', color: 'var(--bf-ink)' }}>{p.name}</div>
-										<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-											{p.hasSizes && <span style={{ fontSize: 10, color: 'var(--bf-mute)', fontWeight: 600 }}>sizes</span>}
-											<span className='bf-mono' style={{ fontSize: 12, fontWeight: 700, color: 'var(--bf-ember)' }}>
-												{p.hasSizes ? `From Rs.${basePrice}` : `Rs.${basePrice}`}
-											</span>
-											{isAdded
-												? <span style={{ fontSize: 10, color: '#166534', background: '#DCFCE7', padding: '2px 8px', borderRadius: 999, fontWeight: 600 }}>Added</span>
-												: <span style={{ fontSize: 10, color: 'var(--bf-ember)', background: 'rgba(232,67,31,.1)', padding: '2px 8px', borderRadius: 999, fontWeight: 600 }}>+ Add</span>
-											}
-										</div>
-									</div>
-								)
-							})}
+
+			{/* Total price preview */}
+			{total != null && (
+				<div style={{ minWidth: 76, textAlign: 'right', flexShrink: 0, paddingRight: 4 }}>
+					<div className='bf-mono' style={{
+						fontSize: 13, fontWeight: 800,
+						color: isUpcharge ? '#15803d' : isDiscount ? '#dc2626' : 'var(--bf-ink)',
+					}}>
+						Rs.{total.toLocaleString('en-PK')}
+					</div>
+					{!isBase && basePrice != null && (
+						<div className='bf-mono' style={{
+							fontSize: 10, color: isUpcharge ? 'rgba(21,128,61,.7)' : 'rgba(220,38,38,.7)',
+							marginTop: 1,
+						}}>
+							{isUpcharge ? '+' : '−'}Rs.{Math.abs(adj).toLocaleString('en-PK')}
 						</div>
-					))}
+					)}
 				</div>
 			)}
+
+			{/* Remove */}
+			<button onClick={onRemove}
+				style={{
+					background: 'none', border: 'none', cursor: 'pointer',
+					padding: 6, color: 'var(--bf-mute)', lineHeight: 1, display: 'flex',
+					fontSize: 18, opacity: .4, flexShrink: 0, borderRadius: 8,
+					transition: 'all .12s',
+				}}
+				onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = 'rgba(232,67,31,.1)'; e.currentTarget.style.color = 'var(--bf-ember)' }}
+				onMouseLeave={e => { e.currentTarget.style.opacity = '.4'; e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--bf-mute)' }}
+			>✕</button>
 		</div>
 	)
 }
 
 // ─── Option group card ────────────────────────────────────────────────────────
-function OptionGroupCard({ group, onChange, onRemove }: {
+function OptionGroupCard({ group, onChange, onRemove, basePrice }: {
 	group: OptionGroup
 	onChange: (updates: Partial<OptionGroup>) => void
 	onRemove: () => void
+	basePrice?: number
 }) {
 	const [choiceInput, setChoiceInput] = useState('')
-	const suggestions = getSuggestions(group.label).filter(s => !group.choices.includes(s))
+	const existingLabels = new Set(group.choices.map(c => c.label))
+	const suggestions = getSuggestions(group.label).filter(s => !existingLabels.has(s))
 
-	function addChoice(val: string) {
-		const v = val.trim()
-		if (!v || group.choices.includes(v)) return
-		onChange({ choices: [...group.choices, v] })
+	function addChoice(label: string, priceAdjustment = 0) {
+		const v = label.trim()
+		if (!v || existingLabels.has(v)) return
+		onChange({ choices: [...group.choices, { label: v, priceAdjustment }] })
 	}
+
+	function updateChoice(i: number, upd: Partial<OptionChoice>) {
+		onChange({ choices: group.choices.map((c, j) => j === i ? { ...c, ...upd } : c) })
+	}
+
+	function removeChoice(i: number) {
+		onChange({ choices: group.choices.filter((_, j) => j !== i) })
+	}
+
+	const hasBasePrice = basePrice != null
 
 	return (
 		<div style={{ background: 'var(--bf-paper)', border: '1px solid var(--bf-line)', borderRadius: 14, overflow: 'hidden' }}>
 			{/* Header row */}
-			<div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid var(--bf-line)' }}>
+			<div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid var(--bf-line)' }}>
 				<input
 					className='bf-input'
 					value={group.label}
@@ -318,26 +582,83 @@ function OptionGroupCard({ group, onChange, onRemove }: {
 				</button>
 			</div>
 
-			{/* Choices + input */}
-			<div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-				{group.choices.length > 0 && (
-					<div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-						{group.choices.map(c => (
-							<span key={c} style={{
-								display: 'inline-flex', alignItems: 'center', gap: 3,
-								padding: '3px 8px 3px 10px', background: 'rgba(232,67,31,.08)',
-								border: '1px solid rgba(232,67,31,.2)', borderRadius: 999,
-								fontSize: 11.5, fontWeight: 600, color: 'var(--bf-ember)',
-							}}>
-								{c}
-								<button onClick={() => onChange({ choices: group.choices.filter(x => x !== c) })}
-									style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit', lineHeight: 1, display: 'flex', fontSize: 15, opacity: .7 }}>×</button>
-							</span>
-						))}
+			{/* Choices area */}
+			<div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+
+				{/* Column header row */}
+				{hasBasePrice && group.choices.length > 0 && (
+					<div style={{
+						display: 'flex', alignItems: 'center', gap: 10,
+						padding: '0 14px 5px 14px',
+						borderBottom: '1px solid var(--bf-line)',
+						marginBottom: 2,
+					}}>
+						<span style={{
+							flex: '1 1 0', minWidth: 70,
+							fontSize: 10, fontWeight: 800, color: 'var(--bf-mute)',
+							textTransform: 'uppercase', letterSpacing: '.08em',
+						}}>Option</span>
+						<span style={{
+							fontSize: 10, fontWeight: 800, color: 'var(--bf-mute)',
+							textTransform: 'uppercase', letterSpacing: '.08em',
+							width: 100, textAlign: 'left', flexShrink: 0,
+						}}>Adjustment</span>
+						<span style={{
+							fontSize: 10, fontWeight: 800, color: 'var(--bf-mute)',
+							textTransform: 'uppercase', letterSpacing: '.08em',
+							minWidth: 76, textAlign: 'right', flexShrink: 0,
+							paddingRight: 4,
+						}}>Final</span>
+						<span style={{ width: 32, flexShrink: 0 }} />
 					</div>
 				)}
+
+				{/* Choice rows with prices */}
+				{hasBasePrice && group.choices.map((c, i) => (
+					<ChoiceRow
+						key={i}
+						choice={c}
+						basePrice={basePrice}
+						onUpdate={upd => updateChoice(group.choices.indexOf(c), upd)}
+						onRemove={() => removeChoice(group.choices.indexOf(c))}
+					/>
+				))}
+
+				{/* Choice rows without prices (no basePrice context) */}
+				{!hasBasePrice && group.choices.map((c, i) => (
+					<div key={i} style={{
+						display: 'flex', alignItems: 'center', gap: 5,
+						padding: '5px 8px 5px 10px',
+						background: 'rgba(232,67,31,.06)',
+						border: '1px solid rgba(232,67,31,.15)',
+						borderRadius: 10,
+					}}>
+						<input
+							className='bf-input'
+							value={c.label}
+							onChange={e => updateChoice(group.choices.indexOf(c), { label: e.target.value })}
+							style={{ flex: 1, height: 28, fontSize: 12, fontWeight: 600, minWidth: 0 }}
+							placeholder='Choice label'
+						/>
+						<div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+							<span className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)', fontWeight: 600 }}>+Rs.</span>
+							<input
+								className='bf-input bf-mono'
+								type='number'
+								value={c.priceAdjustment || ''}
+								onChange={e => updateChoice(group.choices.indexOf(c), { priceAdjustment: e.target.value ? parseFloat(e.target.value) : 0 })}
+								style={{ width: 60, height: 28, fontSize: 11, fontWeight: 700, textAlign: 'right' }}
+								placeholder='0'
+							/>
+						</div>
+						<button onClick={() => removeChoice(group.choices.indexOf(c))}
+							style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--bf-mute)', lineHeight: 1, display: 'flex', fontSize: 15, opacity: .7, flexShrink: 0 }}>×</button>
+					</div>
+				))}
+
+				{/* Quick add suggestions */}
 				{suggestions.length > 0 && (
-					<div>
+					<div style={{ paddingTop: 4 }}>
 						<div style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--bf-mute)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 5 }}>Quick add</div>
 						<div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
 							{suggestions.map(s => (
@@ -346,6 +667,8 @@ function OptionGroupCard({ group, onChange, onRemove }: {
 						</div>
 					</div>
 				)}
+
+				{/* Custom input */}
 				<div style={{ display: 'flex', gap: 6 }}>
 					<input
 						className='bf-input'
@@ -363,12 +686,12 @@ function OptionGroupCard({ group, onChange, onRemove }: {
 }
 
 // ─── Option groups editor ─────────────────────────────────────────────────────
-function OptionGroupsEditor({ options, onChange }: { options: OptionGroup[]; onChange: (opts: OptionGroup[]) => void }) {
+function OptionGroupsEditor({ options, onChange, basePrice }: { options: OptionGroup[]; onChange: (opts: OptionGroup[]) => void; basePrice?: number }) {
 	const usedLabels = new Set(options.map(g => g.label.toLowerCase()))
 
 	function addGroup(preset?: OptionGroup) {
 		if (preset && usedLabels.has(preset.label.toLowerCase())) return
-		onChange([...options, preset ? { ...preset, choices: [...preset.choices] } : { label: '', type: 'single', required: false, choices: [] }])
+		onChange([...options, preset ? { ...preset, choices: preset.choices.map(c => ({ ...c })) } : { label: '', type: 'single', required: false, choices: [] }])
 	}
 
 	return (
@@ -377,6 +700,7 @@ function OptionGroupsEditor({ options, onChange }: { options: OptionGroup[]; onC
 				<OptionGroupCard
 					key={i}
 					group={g}
+					basePrice={basePrice}
 					onChange={upd => onChange(options.map((x, j) => j === i ? { ...x, ...upd } : x))}
 					onRemove={() => onChange(options.filter((_, j) => j !== i))}
 				/>
@@ -408,7 +732,7 @@ function ItemConfigPanel({ item, onUpdate }: { item: SelectedItem; onUpdate: (up
 					Define what customers choose when ordering this item · Single = pick one, Multi = pick many
 				</div>
 			</div>
-			<OptionGroupsEditor options={item.options} onChange={opts => onUpdate({ options: opts })} />
+			<OptionGroupsEditor options={item.options} basePrice={item.unitPrice} onChange={opts => onUpdate({ options: opts })} />
 		</div>
 	)
 }
@@ -422,6 +746,8 @@ function SelectedItemsList({ items, onChange }: { items: SelectedItem[]; onChang
 			{items.map((item, i) => {
 				const isExpanded = expandedIndex === i
 				const hasOptions = item.options.length > 0
+				const maxAdj = item.options.reduce((a, g) => a + g.choices.reduce((m, c) => Math.max(m, c.priceAdjustment ?? 0), 0), 0)
+				const priceRange = maxAdj > 0 ? `Rs.${item.unitPrice.toLocaleString('en-PK')}–${(item.unitPrice + maxAdj).toLocaleString('en-PK')}` : null
 				return (
 					<div key={i} style={{
 						background: 'var(--bf-paper)',
@@ -433,14 +759,21 @@ function SelectedItemsList({ items, onChange }: { items: SelectedItem[]; onChang
 							<div style={{ flex: 1, minWidth: 0 }}>
 								<div style={{ font: '600 13px var(--bf-font)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
 								{hasOptions && (
-									<div style={{ fontSize: 10.5, color: 'var(--bf-mute)', marginTop: 2 }}>
-										{item.options.map(g => `${g.label}${g.choices.length ? ` (${g.choices.length})` : ''}`).join(' · ')}
+									<div style={{ fontSize: 10, color: 'var(--bf-mute)', marginTop: 2, lineHeight: 1.4 }}>
+										{item.options.map(g => {
+											const adjStr = g.choices.some(c => c.priceAdjustment)
+												? g.choices.map(c => `${c.label}${c.priceAdjustment ? `+Rs.${c.priceAdjustment}` : ''}`).join(', ')
+												: g.choices.map(c => c.label).join(', ')
+											return `${g.label}: ${adjStr}`
+										}).join(' · ')}
 									</div>
 								)}
 							</div>
-							<span className='bf-mono' style={{ fontSize: 10.5, color: 'var(--bf-mute)', flexShrink: 0 }}>
-								Rs.{item.unitPrice.toLocaleString('en-PK')}/ea
-							</span>
+							<div style={{ flexShrink: 0, textAlign: 'right' }}>
+								<span className='bf-mono' style={{ fontSize: 10.5, color: 'var(--bf-mute)' }}>
+									{priceRange ?? `Rs.${item.unitPrice.toLocaleString('en-PK')}`}/ea
+								</span>
+							</div>
 							<div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'var(--bf-cream-2)', borderRadius: 8, padding: '2px 4px', flexShrink: 0 }}>
 								<button
 									className='bf-btn bf-btn-ghost bf-btn-icon'
@@ -465,7 +798,7 @@ function SelectedItemsList({ items, onChange }: { items: SelectedItem[]; onChang
 								className='bf-btn bf-btn-ghost bf-btn-icon'
 								style={{ width: 28, height: 28, color: isExpanded ? 'var(--bf-ember)' : 'var(--bf-mute)', flexShrink: 0 }}
 								onClick={() => setExpandedIndex(isExpanded ? null : i)}
-								title='Configure size & flavors'
+								title='Configure options'
 							>
 								<svg width={14} height={14} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
 									<path d='M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z'/>
@@ -497,16 +830,19 @@ function DealPreview({ form, items }: { form: DealFormState; items: SelectedItem
 		const parts = [`${i.qty}× ${i.name}`]
 		for (const g of i.options) {
 			if (g.choices.length > 0) {
-				const preview = g.choices.slice(0, 2).join(', ') + (g.choices.length > 2 ? '…' : '')
+				const preview = g.choices.slice(0, 2).map(c => `${c.label}${c.priceAdjustment ? `+Rs.${c.priceAdjustment}` : ''}`).join(', ') + (g.choices.length > 2 ? '…' : '')
 				parts.push(`${g.label}: ${preview}`)
 			}
 		}
 		return parts.join(' · ')
 	})
-	const sav = getSavings(form.originalPrice ?? 0, form.discountPrice)
+	const baseOrig = form.originalPrice ?? 0
+	const maxOrig = calcOriginalMax(items)
+	const sav = getSavings(maxOrig || baseOrig, form.discountPrice)
 	const isEmpty = !form.title.trim()
 	const expiryInfo = getExpiryInfo(form.expiresAt)
 	const startInfo = getStartInfo(form.startsAt)
+	const hasPriceRange = maxOrig > baseOrig
 
 	return (
 		<div>
@@ -573,7 +909,7 @@ function DealPreview({ form, items }: { form: DealFormState; items: SelectedItem
 						<div>
 							{form.originalPrice != null && (
 								<div className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)', textDecoration: 'line-through' }}>
-									Rs.{form.originalPrice.toLocaleString('en-PK')}
+									{hasPriceRange ? `Rs.${baseOrig.toLocaleString('en-PK')} – Rs.${maxOrig.toLocaleString('en-PK')}` : `Rs.${baseOrig.toLocaleString('en-PK')}`}
 								</div>
 							)}
 							<div style={{ fontWeight: 800, fontSize: 18, color: 'var(--bf-ember)', letterSpacing: '-0.02em' }}>
@@ -586,6 +922,11 @@ function DealPreview({ form, items }: { form: DealFormState; items: SelectedItem
 							</span>
 						)}
 					</div>
+					{hasPriceRange && (
+						<div style={{ fontSize: 10, color: 'var(--bf-mute)', marginTop: 3 }}>
+							Price varies by option selection (up to Rs.{maxOrig.toLocaleString('en-PK')})
+						</div>
+					)}
 
 					{/* Terms preview */}
 					{form.termsText && (
@@ -599,7 +940,9 @@ function DealPreview({ form, items }: { form: DealFormState; items: SelectedItem
 			{/* Savings highlight */}
 			{sav && (
 				<div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: '#DCFCE7', border: '1px solid #86efac' }}>
-					<div style={{ font: '700 12px var(--bf-font)', color: '#15803d', marginBottom: 3 }}>🎉 Great savings!</div>
+					<div style={{ font: '700 12px var(--bf-font)', color: '#15803d', marginBottom: 3 }}>
+						{hasPriceRange ? '🎉 Save up to' : '🎉 Great savings!'}
+					</div>
 					<div style={{ fontSize: 11, color: '#166534' }}>
 						Customers save <strong>Rs.{sav.amount.toLocaleString('en-PK')}</strong> — <strong>{sav.pct}% off</strong>
 					</div>
@@ -612,7 +955,7 @@ function DealPreview({ form, items }: { form: DealFormState; items: SelectedItem
 					{ ok: !!form.title.trim(), label: 'Deal title' },
 					{ ok: items.length > 0, label: 'Items added' },
 					{ ok: !!form.discountPrice && form.discountPrice > 0, label: 'Deal price set' },
-					{ ok: !form.originalPrice || !form.discountPrice || form.discountPrice <= form.originalPrice, label: 'Price is valid' },
+					{ ok: !maxOrig || !form.discountPrice || form.discountPrice <= maxOrig, label: 'Price is valid' },
 					{ ok: !form.startsAt || !form.expiresAt || new Date(form.expiresAt) > new Date(form.startsAt), label: 'Schedule is valid' },
 				].map(({ ok, label }) => (
 					<div key={label} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -701,19 +1044,23 @@ function DealModal({ deal, products, onClose, onSaved }: {
 		}
 	}, [selectedItems])
 
-	const savings = getSavings(form.originalPrice ?? 0, form.discountPrice)
+	const maxOrig = calcOriginalMax(selectedItems)
+	const savings = getSavings(maxOrig || (form.originalPrice ?? 0), form.discountPrice)
 	const priceError =
-		form.originalPrice != null && form.discountPrice != null && form.discountPrice > form.originalPrice
+		maxOrig > 0 && form.discountPrice != null && form.discountPrice > maxOrig
+			? `Deal price (Rs.${form.discountPrice.toLocaleString('en-PK')}) exceeds max item value (Rs.${maxOrig.toLocaleString('en-PK')})`
+			: form.originalPrice != null && form.discountPrice != null && form.discountPrice > form.originalPrice
 			? `Deal price (Rs.${form.discountPrice.toLocaleString('en-PK')}) cannot exceed original price (Rs.${form.originalPrice.toLocaleString('en-PK')})`
 			: null
 	const scheduleError =
 		form.startsAt && form.expiresAt && new Date(form.expiresAt) <= new Date(form.startsAt)
 			? 'Expiry date must be after start date'
 			: null
-	const canSave = form.title.trim().length > 0 && !priceError && !scheduleError
+	const canSave = form.title.trim().length > 0 && !!form.discountPrice && form.discountPrice > 0 && !priceError && !scheduleError
 
 	async function handleSubmit() {
 		if (!form.title.trim()) { setError('Deal title is required'); return }
+		if (!form.discountPrice || form.discountPrice <= 0) { setError('Deal price is required and must be greater than 0'); return }
 		if (priceError) { setError(priceError); return }
 		if (scheduleError) { setError(scheduleError); return }
 		setSaving(true); setError(null)
@@ -903,10 +1250,13 @@ function DealModal({ deal, products, onClose, onSaved }: {
 										<span style={{ fontSize: 22 }}>🎉</span>
 										<div>
 											<div style={{ font: '700 14px var(--bf-font)', color: '#15803d' }}>
-												Customers save Rs.{savings.amount.toLocaleString('en-PK')} — {savings.pct}% off!
+												{maxOrig > (form.originalPrice ?? 0) ? 'Save up to' : 'Customers save'} Rs.{savings.amount.toLocaleString('en-PK')} — {savings.pct}% off!
 											</div>
 											<div style={{ fontSize: 11, color: '#166534', marginTop: 2 }}>
-												Original Rs.{(form.originalPrice ?? 0).toLocaleString('en-PK')} → Deal Rs.{(form.discountPrice ?? 0).toLocaleString('en-PK')}
+												{maxOrig > (form.originalPrice ?? 0)
+													? `From Rs.${(form.originalPrice ?? 0).toLocaleString('en-PK')} (up to Rs.${maxOrig.toLocaleString('en-PK')}) → Deal Rs.${(form.discountPrice ?? 0).toLocaleString('en-PK')}`
+													: `Original Rs.${(form.originalPrice ?? 0).toLocaleString('en-PK')} → Deal Rs.${(form.discountPrice ?? 0).toLocaleString('en-PK')}`
+												}
 											</div>
 										</div>
 									</div>
@@ -1064,12 +1414,16 @@ function DealCard({ deal, onEdit, onToggle, onDelete, onClone, toggling }: {
 		if (!raw?.trim()) return []
 		if (raw.trim().startsWith('[')) {
 			try {
-				const parsed = JSON.parse(raw) as Array<{ name: string; qty: number; options?: OptionGroup[]; size?: string | null; availableFlavors?: string[] }>
+				const parsed = JSON.parse(raw) as Array<{ name: string; qty: number; options?: any[]; size?: string | null; availableFlavors?: string[] }>
 				return parsed.map(i => {
 					const parts = [`${i.qty}× ${i.name}`]
 					if (i.options?.length) {
 						for (const g of i.options) {
-							if (g.choices.length > 0) parts.push(`${g.label}: ${g.choices.slice(0, 2).join(', ')}${g.choices.length > 2 ? '…' : ''}`)
+							const choices = migrateChoices(g.choices)
+							if (choices.length > 0) {
+								const preview = choices.slice(0, 2).map(c => `${c.label}${c.priceAdjustment ? `+Rs.${c.priceAdjustment}` : ''}`).join(', ')
+								parts.push(`${g.label}: ${preview}${choices.length > 2 ? '…' : ''}`)
+							}
 						}
 					} else {
 						if (i.size) parts.push(i.size)

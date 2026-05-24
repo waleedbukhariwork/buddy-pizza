@@ -29,11 +29,16 @@ export interface Category {
 	isActive: boolean
 }
 
+export interface OptionChoice {
+	label: string
+	priceAdjustment: number
+}
+
 export interface OptionGroup {
 	label: string
 	type: 'single' | 'multi'
 	required: boolean
-	choices: string[]
+	choices: OptionChoice[]
 }
 
 export interface DealItem {
@@ -67,11 +72,36 @@ export interface Deal {
 	displayOrder?: number | null
 }
 
+function migrateChoices(raw: unknown): OptionChoice[] {
+	if (Array.isArray(raw)) {
+		if (raw.length === 0) return []
+		if (typeof raw[0] === 'string') return (raw as string[]).map(s => ({ label: s, priceAdjustment: 0 }))
+		if (typeof raw[0] === 'object' && raw[0] !== null && 'label' in (raw[0] as any)) {
+			return (raw as any[]).map(c => ({ label: c.label ?? '', priceAdjustment: c.priceAdjustment ?? 0 }))
+		}
+	}
+	return []
+}
+
 export function parseDealItems(raw: string | null | undefined): DealItem[] {
 	if (!raw?.trim()) return []
 	if (raw.trim().startsWith('[')) {
 		try {
-			return JSON.parse(raw) as DealItem[]
+			const parsed = JSON.parse(raw) as any[]
+			return parsed.map((item: any) => ({
+				productId: item.productId ?? null,
+				name: item.name ?? '',
+				qty: item.qty ?? 1,
+				unitPrice: item.unitPrice ?? 0,
+				options: item.options?.length ? item.options.map((g: any) => ({
+					label: g.label ?? '',
+					type: g.type === 'multi' ? 'multi' : ('single' as 'single' | 'multi'),
+					required: !!g.required,
+					choices: migrateChoices(g.choices),
+				})) : undefined,
+				size: item.size ?? null,
+				availableFlavors: item.availableFlavors ?? undefined,
+			}))
 		} catch {
 			// fall through to legacy format
 		}
