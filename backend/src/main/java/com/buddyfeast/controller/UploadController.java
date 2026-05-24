@@ -27,10 +27,10 @@ public class UploadController {
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("url", url));
         } catch (AppException e) {
             return ResponseEntity.status(e.getStatus())
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("message", e.getMessage()));
         } catch (IOException e) {
             return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Upload failed. Please try again."));
+                    .body(Map.of("message", "Upload failed. Please try again."));
         }
     }
 
@@ -42,7 +42,7 @@ public class UploadController {
             return ResponseEntity.ok(Map.of("message", "Image deleted successfully"));
         } catch (IOException e) {
             return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Failed to delete image. Please try again."));
+                    .body(Map.of("message", "Failed to delete image. Please try again."));
         }
     }
 }
