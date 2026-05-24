@@ -497,17 +497,20 @@ function ProductPreview({ form }: { form: ProductForm }) {
 }
 
 // ─── Product Modal ────────────────────────────────────────────────────────────
-function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryCreate }: {
+function ProductModal({ mode, product, template, categories, onClose, onSaved, onCategoryCreate }: {
 	mode: 'add' | 'edit'
 	product: Product | null
+	template?: Product | null
 	categories: Category[]
 	onClose: () => void
 	onSaved: () => void
 	onCategoryCreate: (name: string) => Promise<Category>
 }) {
-	const [form, setForm] = useState<ProductForm>(() =>
-		product ? formFromProduct(product) : { ...EMPTY_FORM }
-	)
+	const [form, setForm] = useState<ProductForm>(() => {
+		if (product) return formFromProduct(product)
+		if (template) return { ...formFromProduct(template), name: `Copy of ${template.name}`, isAvailable: false }
+		return { ...EMPTY_FORM }
+	})
 	const [saving, setSaving] = useState(false)
 	const [saveError, setSaveError] = useState<string | null>(null)
 	const [catDialogOpen, setCatDialogOpen] = useState(false)
@@ -610,9 +613,11 @@ function ProductModal({ mode, product, categories, onClose, onSaved, onCategoryC
 				{/* Header */}
 				<div className='bf-admin-modal-header'>
 					<div>
-						<div className='bf-eyebrow' style={{ marginBottom: 3 }}>{mode === 'add' ? 'ADD PRODUCT' : 'EDIT PRODUCT'}</div>
+						<div className='bf-eyebrow' style={{ marginBottom: 3 }}>
+							{mode === 'edit' ? 'EDIT PRODUCT' : template ? 'DUPLICATE PRODUCT' : 'ADD PRODUCT'}
+						</div>
 						<h2 style={{ fontWeight: 800, fontSize: 22, margin: 0, letterSpacing: '-.025em' }}>
-							{form.name.trim() || (mode === 'add' ? 'New product' : 'Edit product')}
+							{form.name.trim() || (mode === 'add' ? (template ? `Copy of ${template.name}` : 'New product') : 'Edit product')}
 						</h2>
 					</div>
 					<button className='bf-btn bf-btn-outline bf-btn-icon' onClick={onClose}>{Icons.x}</button>
@@ -1336,6 +1341,7 @@ export function AdminMenu() {
 	const { data: categoriesData, isLoading: categoriesLoading } = useCategories()
 	const [selectedCat, setSelectedCat] = useState<string | null>(null)
 	const [modal, setModal] = useState<'add' | Product | null>(null)
+	const [dupeSource, setDupeSource] = useState<Product | null>(null)
 	const [deleteId, setDeleteId] = useState<number | null>(null)
 	const [deleting, setDeleting] = useState(false)
 	const [searchQuery, setSearchQuery] = useState('')
@@ -1634,8 +1640,24 @@ export function AdminMenu() {
 												)}
 											</span>
 											<div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-												<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 28, height: 28 }} onClick={() => setModal(it)}>{Icons.edit}</button>
-												<button className='bf-btn bf-btn-ghost bf-btn-icon' style={{ width: 28, height: 28, color: 'var(--bf-ember)' }} onClick={() => setDeleteId(it.id)}>{Icons.trash}</button>
+												<button
+													className='bf-btn bf-btn-ghost bf-btn-icon'
+													style={{ width: 28, height: 28 }}
+													title='Edit'
+													onClick={() => setModal(it)}
+												>{Icons.edit}</button>
+												<button
+													className='bf-btn bf-btn-ghost bf-btn-icon'
+													style={{ width: 28, height: 28, color: 'var(--bf-ink-2)' }}
+													title='Duplicate'
+													onClick={() => { setDupeSource(it); setModal('add') }}
+												>{Icons.copy}</button>
+												<button
+													className='bf-btn bf-btn-ghost bf-btn-icon'
+													style={{ width: 28, height: 28, color: 'var(--bf-ember)' }}
+													title='Delete'
+													onClick={() => setDeleteId(it.id)}
+												>{Icons.trash}</button>
 											</div>
 										</div>
 									)
@@ -1651,9 +1673,10 @@ export function AdminMenu() {
 				<ProductModal
 					mode={modal === 'add' ? 'add' : 'edit'}
 					product={modal === 'add' ? null : modal}
+					template={modal === 'add' ? dupeSource : null}
 					categories={activeCategories}
-					onClose={() => setModal(null)}
-					onSaved={async () => { await mutate(); setModal(null) }}
+					onClose={() => { setModal(null); setDupeSource(null) }}
+					onSaved={async () => { await mutate(); setModal(null); setDupeSource(null) }}
 					onCategoryCreate={handleCategoryCreate}
 				/>
 			)}
