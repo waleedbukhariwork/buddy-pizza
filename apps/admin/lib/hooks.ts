@@ -1,6 +1,6 @@
 import useSWR, { mutate as globalMutate } from 'swr'
 import { apiClient } from './api-client'
-import type { Order, DashboardMetrics, Product, Deal, Category } from './types'
+import type { AdminProfile, Order, DashboardMetrics, Product, Deal, Category } from './types'
 
 async function fetcher<T>(url: string): Promise<T> {
 	const { data } = await apiClient.get<T>(url)
@@ -33,6 +33,20 @@ async function fetchList<T>(
 ): Promise<T[]> {
 	const data = await fetcher<unknown>(url)
 	return extractArray<T>(data, preferredKeys) ?? []
+}
+
+export function useAdminProfile() {
+	return useSWR<AdminProfile>('/v1/admin/profile', fetcher)
+}
+
+export async function updateAdminProfile(data: { name?: string; avatarUrl?: string }): Promise<AdminProfile> {
+	const { data: profile } = await apiClient.put<AdminProfile>('/v1/admin/profile', data)
+	await globalMutate('/v1/admin/profile')
+	return profile
+}
+
+export async function updateAdminPassword(currentPassword: string, newPassword: string): Promise<void> {
+	await apiClient.put('/v1/admin/password', { currentPassword, newPassword })
 }
 
 export function useDashboardMetrics() {

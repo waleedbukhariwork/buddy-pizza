@@ -39,6 +39,7 @@ public class SecurityConfig {
                 .requestMatchers("/v1/products/**").permitAll()
                 .requestMatchers("/v1/deals/**").permitAll()
                 .requestMatchers("/v1/categories/**").permitAll()
+                .requestMatchers("/v1/promo/**").permitAll()
                 // Admin only
                 .requestMatchers("/v1/admin/**").hasAuthority("ADMIN")
                 .requestMatchers("/v1/assets/**").hasAuthority("ADMIN")

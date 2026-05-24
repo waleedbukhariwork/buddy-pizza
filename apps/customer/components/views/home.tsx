@@ -11,6 +11,7 @@ import { Icons } from '../ui/icon'
 import { useSearch } from '../../lib/search-context'
 import { useProducts, useCategories, useDeals } from '../../lib/hooks'
 import { useDeliveryStore, formatEta } from '../../lib/delivery-store'
+import { FeaturedDealsSlider } from '../home/featured-deals-slider'
 
 const TONES: Tone[] = [
 	'ember',
@@ -93,6 +94,7 @@ function HeroV3() {
 	}, [])
 
 	const activeDeals = deals?.filter((d) => d.isActive) ?? []
+	const featuredDeals = activeDeals.filter((d) => d.isFeatured)
 
 	const WORDS = [
 		{ text: 'HOT', mod: 'light' },
@@ -194,67 +196,25 @@ function HeroV3() {
 						</div>
 					</div>
 
-					{/* Right — visual */}
+					{/* Right — Featured deals slider */}
 					<div
 						className={`bf-hero-v3-visual${mounted ? ' bf-rw' : ''}`}
 						style={{ '--d': '0.22s' } as React.CSSProperties}
 					>
-						<div className='bf-hero-v3-img-wrap bf-float'>
-							<div
-								className='bf-img bf-img-ember'
-								style={{ width: '100%', height: '100%', borderRadius: 0 }}
-							>
-								<span className='bf-img-cap'>
-									hero · pepperoni pie, top-down
-								</span>
-							</div>
-						</div>
-
-						{/* Floating chips — glassmorphism on dark */}
-						<div className='bf-hero-chip-dark bf-hero-chip-dark-tl'>
-							<span style={{ fontSize: 22, lineHeight: 1 }}>⭐</span>
-							<div>
-								<div className='bf-hero-chip-dark-key'>4.9 Rating</div>
-								<div className='bf-hero-chip-dark-val'>1,200+ reviews</div>
-							</div>
-						</div>
-
-						{activeDeals[0] && (
-							<Link
-								href='/deals'
-								className='bf-hero-chip-dark bf-hero-chip-dark-bl'
-							>
-								<span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>
-									🔥
-								</span>
-								<div style={{ flex: 1, minWidth: 0 }}>
-									<div className='bf-hero-chip-dark-key'>Deal live now</div>
-									<div
-										className='bf-hero-chip-dark-val'
-										style={{
-											overflow: 'hidden',
-											textOverflow: 'ellipsis',
-											whiteSpace: 'nowrap',
-										}}
-									>
-										{activeDeals[0].title}
-									</div>
-								</div>
-								<svg
-									width={13}
-									height={13}
-									viewBox='0 0 24 24'
-									fill='none'
-									stroke='currentColor'
-									strokeWidth={2.5}
-									strokeLinecap='round'
-									strokeLinejoin='round'
-									style={{ color: 'rgba(250,246,240,0.4)', flexShrink: 0 }}
+						{featuredDeals.length > 0 ? (
+							<FeaturedDealsSlider deals={featuredDeals} />
+						) : (
+							/* Fallback placeholder when no deals */
+							<div className='bf-hero-v3-img-wrap bf-float'>
+								<div
+									className='bf-img bf-img-ember'
+									style={{ width: '100%', height: '100%', borderRadius: 0 }}
 								>
-									<path d='M5 12h14' />
-									<path d='m12 5 7 7-7 7' />
-								</svg>
-							</Link>
+									<span className='bf-img-cap'>
+										hero · pepperoni pie, top-down
+									</span>
+								</div>
+							</div>
 						)}
 					</div>
 				</div>

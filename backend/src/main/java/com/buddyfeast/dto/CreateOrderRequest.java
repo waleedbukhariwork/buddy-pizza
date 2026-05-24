@@ -12,6 +12,7 @@ public class CreateOrderRequest {
     private String deliveryAddress;
     private String customerPhone;
     private String specialNotes;
+    private String promoCode;
     
     @Getter
     @Setter

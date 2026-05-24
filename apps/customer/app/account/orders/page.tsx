@@ -1,10 +1,11 @@
 'use client'
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { CustomerShell } from '../../../components/layout/customer-shell'
 import { Icons } from '../../../components/ui/icon'
 import { useMyOrders, rs, timeAgo } from '../../../lib/hooks'
 import { useCartStore } from '../../../lib/cart-store'
+import { useAuthStore } from '../../../lib/auth-store'
 
 const STATUS_STYLES: Record<string, { pill: string; label: string }> = {
 	NEW:        { pill: 'bf-pill-amber', label: 'New' },
@@ -193,7 +194,15 @@ function OrderCard({ order }: { order: ReturnType<typeof useMyOrders>['data'] ex
 }
 
 export default function OrdersPage() {
-	const { data: orders, isLoading, error, mutate } = useMyOrders()
+	const { token, hydrate } = useAuthStore()
+	const [hydrated, setHydrated] = useState(false)
+
+	useEffect(() => {
+		hydrate()
+		setHydrated(true)
+	}, [hydrate])
+
+	const { data: orders, isLoading, error, mutate } = useMyOrders(!!token)
 	const [tab, setTab] = useState<TabKey>('all')
 	const [search, setSearch] = useState('')
 
@@ -209,6 +218,57 @@ export default function OrdersPage() {
 		}
 		return result
 	}, [orders, tab, search])
+
+	if (!hydrated) {
+		return (
+			<CustomerShell activePage='orders'>
+				<main style={{ maxWidth: 720, margin: '0 auto', padding: '40px 32px 56px' }}>
+					<div className='bf-oh-list'>
+						{Array.from({ length: 3 }).map((_, i) => (
+							<div key={i} className='bf-skeleton' style={{ height: 130, borderRadius: 'var(--bf-radius)' }} />
+						))}
+					</div>
+				</main>
+			</CustomerShell>
+		)
+	}
+
+	if (!token) {
+		return (
+			<CustomerShell activePage='orders'>
+				<main style={{ maxWidth: 720, margin: '0 auto', padding: '40px 32px 56px' }}>
+					<div className='bf-oh-header'>
+						<div className='bf-oh-title-area'>
+							<div>
+								<div className='bf-eyebrow' style={{ marginBottom: 4 }}>ACCOUNT</div>
+								<h1>Order history</h1>
+							</div>
+						</div>
+					</div>
+					<div className='bf-card' style={{ padding: '64px 24px', textAlign: 'center' }}>
+						<div style={{ fontSize: 52, marginBottom: 20, lineHeight: 1 }}>
+							<svg width='64' height='64' viewBox='0 0 24 24' fill='none' stroke='var(--bf-ink-2)' strokeWidth='1.2' strokeLinecap='round' strokeLinejoin='round'>
+								<path d='M5 3v18l2-1 2 1 2-1 2 1 2-1 2 1 2-1V3z' />
+								<path d='M9 8h6M9 12h6M9 16h4' />
+							</svg>
+						</div>
+						<div style={{ fontWeight: 800, fontSize: 22, letterSpacing: '-0.025em' }}>Sign in to view your orders</div>
+						<div style={{ color: 'var(--bf-ink-2)', fontSize: 15, marginTop: 8, marginBottom: 28, maxWidth: 320, marginLeft: 'auto', marginRight: 'auto' }}>
+							Track your orders, reorder past favourites, and see your full history.
+						</div>
+						<Link href='/auth/login?redirect=/account/orders' className='bf-btn bf-btn-primary bf-btn-lg' style={{ display: 'inline-flex' }}>
+							Sign in {Icons.arrow}
+						</Link>
+						<div style={{ marginTop: 16 }}>
+							<Link href='/' style={{ fontSize: 13, color: 'var(--bf-mute)', textDecoration: 'underline' }}>
+								Continue as guest
+							</Link>
+						</div>
+					</div>
+				</main>
+			</CustomerShell>
+		)
+	}
 
 	return (
 		<CustomerShell activePage='orders'>

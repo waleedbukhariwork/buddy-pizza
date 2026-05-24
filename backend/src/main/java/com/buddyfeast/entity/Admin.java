@@ -19,6 +19,11 @@ public class Admin {
     private String email;
     private String password;
     
+    private String name;
+    
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+    
     @Enumerated(EnumType.STRING)
     private AdminRole role;
     

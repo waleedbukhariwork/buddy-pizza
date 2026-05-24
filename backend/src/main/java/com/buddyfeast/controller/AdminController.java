@@ -1,8 +1,11 @@
 package com.buddyfeast.controller;
 
+import com.buddyfeast.dto.AdminProfileDTO;
 import com.buddyfeast.dto.DashboardMetricsDTO;
 import com.buddyfeast.dto.DealDTO;
 import com.buddyfeast.dto.ProductDTO;
+import com.buddyfeast.dto.UpdateAdminPasswordRequest;
+import com.buddyfeast.dto.UpdateAdminProfileRequest;
 import com.buddyfeast.entity.Category;
 import com.buddyfeast.entity.Deal;
 import com.buddyfeast.entity.Order;
@@ -17,6 +20,7 @@ import com.buddyfeast.service.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -44,7 +48,27 @@ public class AdminController {
 
     @Autowired
     private OrderService orderService;
-    
+
+    @GetMapping("/profile")
+    public ResponseEntity<AdminProfileDTO> getProfile(Authentication authentication) {
+        return ResponseEntity.ok(adminService.getProfile(authentication.getName()));
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<AdminProfileDTO> updateProfile(
+            Authentication authentication,
+            @RequestBody UpdateAdminProfileRequest request) {
+        return ResponseEntity.ok(adminService.updateProfile(authentication.getName(), request));
+    }
+
+    @PutMapping("/password")
+    public ResponseEntity<Void> updatePassword(
+            Authentication authentication,
+            @RequestBody UpdateAdminPasswordRequest request) {
+        adminService.updatePassword(authentication.getName(), request);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/dashboard")
     public ResponseEntity<DashboardMetricsDTO> getDashboard() {
         return ResponseEntity.ok(adminService.getDashboardMetrics());

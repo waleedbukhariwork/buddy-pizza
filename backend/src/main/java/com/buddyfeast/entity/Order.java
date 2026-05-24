@@ -37,6 +37,7 @@ public class Order {
     private String deliveryAddress;
     private String customerPhone;
     private String specialNotes;
+    private String promoCode;
     
     @ManyToOne
     @JoinColumn(name = "rider_id")

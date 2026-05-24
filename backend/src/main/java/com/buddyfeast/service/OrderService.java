@@ -32,11 +32,24 @@ public class OrderService {
     private RiderRepository riderRepository;
 
     @Autowired
+    private PromoCodeService promoCodeService;
+
+    @Autowired
     private EmailService emailService;
 
     public OrderDTO createOrder(CreateOrderRequest request, Long userId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Validate promo code before processing items (fail fast)
+        double promoDiscount = 0.0;
+        String appliedPromo = null;
+        if (request.getPromoCode() != null && !request.getPromoCode().isBlank()) {
+            PromoCodeService.PromoResult promo = promoCodeService.validate(request.getPromoCode(), 0);
+            if (promo.isValid()) {
+                appliedPromo = request.getPromoCode().trim().toUpperCase();
+            }
+        }
 
         Order order = Order.builder()
             .orderNumber("#BF-" + UUID.randomUUID().toString().substring(0, 4).toUpperCase())
@@ -44,6 +57,7 @@ public class OrderService {
             .deliveryAddress(request.getDeliveryAddress())
             .customerPhone(request.getCustomerPhone())
             .specialNotes(request.getSpecialNotes())
+            .promoCode(appliedPromo)
             .status(Order.OrderStatus.NEW)
             .build();
 
@@ -87,12 +101,25 @@ public class OrderService {
             }
         }).collect(Collectors.toList());
 
-        double total = items.stream()
+        double subtotal = items.stream()
             .mapToDouble(item -> item.getPrice() * item.getQuantity())
             .sum();
 
+        // Re-validate promo with actual subtotal for percentage-based codes
+        double discount = 0.0;
+        if (appliedPromo != null) {
+            PromoCodeService.PromoResult promo = promoCodeService.validate(appliedPromo, subtotal);
+            if (promo.isValid()) {
+                discount = promo.getDiscount();
+            }
+        }
+
+        double total = Math.max(0, subtotal - discount);
+
         order.setItems(items);
-        order.setSubtotal(total);
+        order.setSubtotal(subtotal);
+        order.setDiscount(discount);
+        order.setDeliveryFee(0.0);
         order.setTotal(total);
 
         orderRepository.save(order);
@@ -172,9 +199,13 @@ public class OrderService {
             .id(order.getId())
             .orderNumber(order.getOrderNumber())
             .items(itemDTOs)
+            .subtotal(order.getSubtotal())
+            .discount(order.getDiscount() != null ? order.getDiscount() : 0.0)
+            .deliveryFee(order.getDeliveryFee() != null ? order.getDeliveryFee() : 0.0)
             .total(order.getTotal())
             .status(order.getStatus().toString())
             .deliveryAddress(order.getDeliveryAddress())
+            .promoCode(order.getPromoCode())
             .createdAt(order.getCreatedAt())
             .build();
     }

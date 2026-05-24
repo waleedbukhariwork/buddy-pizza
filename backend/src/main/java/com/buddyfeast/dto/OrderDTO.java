@@ -13,9 +13,13 @@ public class OrderDTO {
     private Long id;
     private String orderNumber;
     private List<OrderItemDTO> items;
+    private Double subtotal;
+    private Double discount;
+    private Double deliveryFee;
     private Double total;
     private String status;
     private String deliveryAddress;
+    private String promoCode;
     private LocalDateTime createdAt;
     
     @Getter

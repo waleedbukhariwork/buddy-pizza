@@ -28,7 +28,7 @@ const NAV_ICONS: Record<string, React.ReactNode> = {
 export function AdminShell({ children, active }: { children: React.ReactNode; active?: string }) {
 	const pathname = usePathname()
 	const router = useRouter()
-	const { adminToken, isHydrated, hydrate, logout } = useAdminAuthStore()
+	const { adminToken, isHydrated, hydrate } = useAdminAuthStore()
 	const { data: orders } = useOrders()
 
 	useEffect(() => { hydrate() }, [hydrate])
@@ -103,42 +103,6 @@ export function AdminShell({ children, active }: { children: React.ReactNode; ac
 				</nav>
 
 				<div style={{ flex: 1 }} />
-
-				{/* User footer */}
-				<div className='bf-admin-sidebar-user'>
-					<div style={{
-						width: 34, height: 34, borderRadius: '50%',
-						background: 'linear-gradient(135deg, var(--bf-amber), #e89a0e)',
-						color: 'var(--bf-ink)',
-						display: 'grid', placeItems: 'center',
-						font: '800 13px var(--bf-font)',
-						flexShrink: 0,
-						boxShadow: '0 2px 8px rgba(255,182,39,.35)',
-					}}>
-						A
-					</div>
-					<div className='bf-admin-sidebar-user-info' style={{ flex: 1, minWidth: 0 }}>
-						<div style={{ font: '700 13px var(--bf-font)', color: '#fff', letterSpacing: '-0.01em' }}>Admin</div>
-						<div className='bf-mono' style={{ fontSize: 9.5, color: 'rgba(255,255,255,.45)', letterSpacing: '.08em' }}>OWNER</div>
-					</div>
-					<button
-						onClick={logout}
-						className='bf-admin-sidebar-logout'
-						title='Sign out'
-						style={{
-							width: 28, height: 28, borderRadius: 8,
-							border: 0, background: 'rgba(255,255,255,.08)',
-							color: 'rgba(255,255,255,.45)',
-							display: 'grid', placeItems: 'center',
-							cursor: 'pointer',
-							transition: 'background .15s, color .15s',
-						}}
-						onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(232,67,31,.25)'; e.currentTarget.style.color = '#ff6b6b' }}
-						onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,.08)'; e.currentTarget.style.color = 'rgba(255,255,255,.45)' }}
-					>
-						{Icons.logout}
-					</button>
-				</div>
 			</aside>
 
 			{/* ── Main content ── */}

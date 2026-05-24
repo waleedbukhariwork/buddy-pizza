@@ -3,8 +3,11 @@
 	"version": "1.0.0",
 	"private": true,
 	"scripts": {
-		"dev": "next dev -p 3003",
-		"build": "next build",
+		"dev": "dotenv -e env/local.env -- next dev -p 3003",
+		"dev:staging": "dotenv -e env/staging.env -- next dev -p 3003",
+		"build": "dotenv -e env/production.env -- next build",
+		"build:staging": "dotenv -e env/staging.env -- next build",
+		"build:local": "dotenv -e env/local.env -- next build",
 		"start": "next start",
 		"lint": "next lint"
 	},
@@ -23,6 +26,7 @@
 		"@types/react": "^18.0.0",
 		"@types/react-dom": "^18.0.0",
 		"autoprefixer": "^10.4.0",
+		"dotenv-cli": "^11.0.0",
 		"eslint": "^8.0.0",
 		"eslint-config-next": "^14.0.0",
 		"postcss": "^8.4.0",

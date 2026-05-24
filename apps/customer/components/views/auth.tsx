@@ -794,6 +794,56 @@ function OtpStep({ identifier, onBack, onSuccess }: OtpStepProps) {
 
 // ─── Sign In ──────────────────────────────────────────────────────────────────
 
+function OtpFlow({ identifier, onBack, onSuccess: propsOnSuccess }: { identifier: string; onBack: () => void; onSuccess: (token: string, user: User | undefined) => void }) {
+	const { setToken, setUser } = useAuthStore()
+
+	function handleOtpSuccess(token: string, user: User | undefined) {
+		localStorage.setItem('token', token)
+		if (user) localStorage.setItem('user', JSON.stringify(user))
+		setToken(token)
+		if (user) setUser(user)
+		propsOnSuccess(token, user)
+	}
+
+	return (
+		<AuthShell>
+			<div
+				className='bf-auth-grid'
+				style={{
+					width: '100%',
+					maxWidth: 900,
+					display: 'grid',
+					gridTemplateColumns: '1fr 1fr',
+					background: 'var(--bf-paper)',
+					borderRadius: 20,
+					overflow: 'hidden',
+					boxShadow: '0 24px 60px rgba(35,31,32,.14)',
+				}}
+			>
+				<div className='bf-auth-panel-col' style={{ padding: 40 }}>
+					<AuthPanel />
+				</div>
+				<div
+					className='bf-auth-form-col'
+					style={{
+						padding: '48px 48px',
+						display: 'flex',
+						flexDirection: 'column',
+						justifyContent: 'center',
+						borderLeft: '1px solid var(--bf-line)',
+					}}
+				>
+					<OtpStep
+						identifier={identifier}
+						onBack={onBack}
+						onSuccess={handleOtpSuccess}
+					/>
+				</div>
+			</div>
+		</AuthShell>
+	)
+}
+
 function AuthSignIn() {
 	const router = useRouter()
 	const searchParams = useSearchParams()
@@ -807,6 +857,7 @@ function AuthSignIn() {
 	const [isLoading, setIsLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [fieldErrors, setFieldErrors] = useState<{ field: string; message: string }[]>([])
+	const [unverifiedIdentifier, setUnverifiedIdentifier] = useState<string | null>(null)
 
 	function fieldHasError(field: string) {
 		return fieldErrors.some((e) => e.field === field)
@@ -847,9 +898,14 @@ function AuthSignIn() {
 			const msg = (err as { response?: { data?: { message?: string } } })
 				?.response?.data?.message
 			if (msg === 'UNVERIFIED') {
-				setError(
-					'Your account is not verified yet. Please sign up again to complete verification.',
-				)
+				try {
+					await apiClient.post('/v1/auth/customer/resend-otp', {
+						identifier: email.trim().toLowerCase(),
+					})
+					setUnverifiedIdentifier(email.trim().toLowerCase())
+				} catch {
+					setError('Failed to send verification code. Please try again.')
+				}
 			} else if (status === 401) {
 				setError('Incorrect password.')
 			} else if (status === 404) {
@@ -860,6 +916,16 @@ function AuthSignIn() {
 		} finally {
 			setIsLoading(false)
 		}
+	}
+
+	if (unverifiedIdentifier) {
+		return (
+			<OtpFlow
+				identifier={unverifiedIdentifier}
+				onBack={() => setUnverifiedIdentifier(null)}
+				onSuccess={() => router.push(redirect ?? '/')}
+			/>
+		)
 	}
 
 	return (

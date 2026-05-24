@@ -1,12 +1,24 @@
 {
 	"$schema": "https://turbo.build/schema.json",
-	"globalDependencies": ["**/.env.local"],
+	"globalDependencies": ["**/env/*.env"],
 	"pipeline": {
 		"dev": {
 			"cache": false,
 			"persistent": true
 		},
+		"dev:staging": {
+			"cache": false,
+			"persistent": true
+		},
 		"build": {
+			"outputs": [".next/**", "dist/**"],
+			"cache": true
+		},
+		"build:staging": {
+			"outputs": [".next/**", "dist/**"],
+			"cache": true
+		},
+		"build:local": {
 			"outputs": [".next/**", "dist/**"],
 			"cache": true
 		},

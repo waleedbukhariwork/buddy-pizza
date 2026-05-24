@@ -55,6 +55,7 @@ export interface Deal {
 	badge?: string | null
 	items?: string | null
 	isActive: boolean
+	isFeatured?: boolean | null
 	imageUrl?: string | null
 	termsText?: string | null
 	startsAt?: string | null
@@ -181,6 +182,7 @@ export async function placeOrder(payload: {
 	deliveryAddress: string
 	customerPhone: string
 	specialNotes?: string
+	promoCode?: string
 }): Promise<PlacedOrder> {
 	const { data } = await apiClient.post<PlacedOrder>('/v1/orders', payload)
 	return data
@@ -223,4 +225,16 @@ export function timeAgo(dateStr: string): string {
 	const hrs = Math.floor(mins / 60)
 	if (hrs < 24) return `${hrs}h ago`
 	return new Date(dateStr).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })
+}
+
+// ─── Promo code validation ────────────────────────────────────────────────────
+export interface PromoResult {
+	valid: boolean
+	discount: number
+	message: string
+}
+
+export async function validatePromoCode(code: string, cartTotal: number): Promise<PromoResult> {
+	const { data } = await apiClient.post<PromoResult>('/v1/promo/validate', { code, cartTotal })
+	return data
 }

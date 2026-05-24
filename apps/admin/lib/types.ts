@@ -1,3 +1,11 @@
+export interface AdminProfile {
+	id: number
+	email: string
+	name: string | null
+	avatarUrl: string | null
+	role: string
+}
+
 export type OrderStatus =
 	| 'NEW'
 	| 'PREPARING'

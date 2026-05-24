@@ -2,6 +2,11 @@
 .env.*.local
 node_modules/
 
+# Environment files — never commit real env values, set via Render dashboard or copy locally
+# Copy env/example.env → env/local.env and fill in your values
+**/env/*.env
+!**/env/example.env
+
 # Spring Boot local secrets
 application-local.properties
 .next/
@@ -18,3 +23,4 @@ target/
 
 
 scripts/
+
