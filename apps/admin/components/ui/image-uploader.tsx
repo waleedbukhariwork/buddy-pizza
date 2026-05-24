@@ -56,36 +56,86 @@ export function ImageUploader({ value, onChange, folder }: { value: string; onCh
 		if (file) handleFile(file)
 	}
 
+	const [lightbox, setLightbox] = useState(false)
+	const [hovered, setHovered] = useState(false)
+
 	if (value) {
 		return (
-			<div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: '1px solid var(--bf-line)' }}>
-				<img
-					src={value} alt='Uploaded image'
-					style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }}
-					onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-				/>
-				<div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 6 }}>
-					<button
-						onClick={() => !uploading && inputRef.current?.click()}
-						disabled={uploading}
-						style={{ background: 'rgba(35,31,32,.72)', backdropFilter: 'blur(6px)', border: 'none', borderRadius: 8, cursor: uploading ? 'default' : 'pointer', padding: '5px 11px', fontSize: 11, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 5 }}
+			<>
+				<div style={{ borderRadius: 14, border: '1px solid var(--bf-line)', overflow: 'hidden', background: 'var(--bf-cream-2)' }}>
+					{/* Image area */}
+					<div
+						style={{ position: 'relative', cursor: 'zoom-in' }}
+						onClick={() => setLightbox(true)}
+						onMouseEnter={() => setHovered(true)}
+						onMouseLeave={() => setHovered(false)}
 					>
-						<svg width={12} height={12} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round'><path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/><polyline points='17 8 12 3 7 8'/><line x1='12' y1='3' x2='12' y2='15'/></svg>
-						{uploading ? 'Uploading…' : 'Replace'}
-					</button>
-					<button
-						onClick={() => { deleteImage(value); onChange('') }}
-						style={{ background: 'rgba(35,31,32,.72)', backdropFilter: 'blur(6px)', border: 'none', borderRadius: 8, cursor: 'pointer', padding: '5px 10px', fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1 }}
-						title='Remove image'
-					>×</button>
+						<img
+							src={value} alt='Uploaded image'
+							style={{ width: '100%', height: 200, objectFit: 'cover', display: 'block', transition: 'filter .2s', filter: hovered ? 'brightness(.88)' : 'none' }}
+							onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+						/>
+						{/* Hover overlay — eye icon */}
+						<div style={{
+							position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+							opacity: hovered ? 1 : 0, transition: 'opacity .2s', pointerEvents: 'none',
+						}}>
+							<div style={{ background: 'rgba(35,31,32,.65)', backdropFilter: 'blur(6px)', borderRadius: 10, padding: '7px 13px', display: 'flex', alignItems: 'center', gap: 6, color: '#fff', fontSize: 12, fontWeight: 700 }}>
+								<svg width={14} height={14} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2.2} strokeLinecap='round' strokeLinejoin='round'><path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/><circle cx='12' cy='12' r='3'/></svg>
+								Preview
+							</div>
+						</div>
+						{/* Upload progress bar */}
+						{uploading && (
+							<div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: 'rgba(255,255,255,.3)', overflow: 'hidden' }}>
+								<div style={{ position: 'absolute', top: 0, height: '100%', width: '50%', background: 'var(--bf-ember)', borderRadius: 999, animation: 'bf-upload-slide 1s ease-in-out infinite' }} />
+							</div>
+						)}
+					</div>
+
+					{/* Action row below image */}
+					<div style={{ display: 'flex', gap: 8, padding: '10px 12px', borderTop: '1px solid var(--bf-line)' }}>
+						<button
+							onClick={() => !uploading && inputRef.current?.click()}
+							disabled={uploading}
+							style={{ flex: 1, background: 'var(--bf-paper)', border: '1px solid var(--bf-line)', borderRadius: 8, cursor: uploading ? 'default' : 'pointer', padding: '7px 12px', fontSize: 12, fontWeight: 700, color: 'var(--bf-ink-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+						>
+							<svg width={13} height={13} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round'><path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/><polyline points='17 8 12 3 7 8'/><line x1='12' y1='3' x2='12' y2='15'/></svg>
+							{uploading ? 'Uploading…' : 'Replace image'}
+						</button>
+						<button
+							onClick={() => { deleteImage(value); onChange('') }}
+							style={{ background: 'transparent', border: '1px solid var(--bf-line)', borderRadius: 8, cursor: 'pointer', padding: '7px 12px', fontSize: 12, fontWeight: 700, color: 'var(--bf-ember)', display: 'flex', alignItems: 'center', gap: 5 }}
+							title='Remove image'
+						>
+							<svg width={13} height={13} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round'><polyline points='3 6 5 6 21 6'/><path d='M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6'/><path d='M10 11v6'/><path d='M14 11v6'/></svg>
+							Remove
+						</button>
+					</div>
 				</div>
-				{uploading && (
-					<div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: 'rgba(255,255,255,.3)', overflow: 'hidden' }}>
-						<div style={{ position: 'absolute', top: 0, height: '100%', width: '50%', background: 'var(--bf-ember)', borderRadius: 999, animation: 'bf-upload-slide 1s ease-in-out infinite' }} />
+
+				{/* Lightbox */}
+				{lightbox && (
+					<div
+						onClick={() => setLightbox(false)}
+						style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,.82)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}
+					>
+						<img
+							src={value} alt='Product image preview'
+							style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 16, objectFit: 'contain', boxShadow: '0 24px 80px rgba(0,0,0,.5)' }}
+							onClick={e => e.stopPropagation()}
+						/>
+						<button
+							onClick={() => setLightbox(false)}
+							style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,.12)', border: 'none', borderRadius: 10, cursor: 'pointer', width: 38, height: 38, display: 'grid', placeItems: 'center', color: '#fff' }}
+						>
+							<svg width={18} height={18} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round'><line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/></svg>
+						</button>
 					</div>
 				)}
+
 				<input ref={inputRef} type='file' accept={UPLOAD_ACCEPT} style={{ display: 'none' }} onChange={onInput} />
-			</div>
+			</>
 		)
 	}
 

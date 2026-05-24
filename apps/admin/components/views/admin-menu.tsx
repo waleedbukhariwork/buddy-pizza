@@ -1509,14 +1509,8 @@ export function AdminMenu() {
 					{/* Scrollable table */}
 					<div className='bf-admin-menu-table-scroll'>
 						<div className='bf-admin-menu-table-min'>
-							{/* Table header */}
-							<div style={{
-								display: 'grid', gridTemplateColumns: '44px 64px 1.4fr 1fr 160px 110px 80px',
-								gap: 12, font: '600 10px var(--bf-mono)', color: 'var(--bf-mute)',
-								letterSpacing: '.08em', textTransform: 'uppercase',
-								padding: '10px 22px', borderBottom: '1px solid var(--bf-line)',
-								background: 'var(--bf-cream-2)',
-							}}>
+							{/* Table header — hidden on mobile via CSS */}
+							<div className='bf-admin-menu-table-header'>
 								<span /><span>IMAGE</span><span>NAME</span><span>CATEGORY</span>
 								<span>PRICE</span><span>STATUS</span>
 								<span style={{ textAlign: 'right' }}>ACTIONS</span>
@@ -1525,10 +1519,7 @@ export function AdminMenu() {
 							{isLoading ? (
 								<div style={{ display: 'flex', flexDirection: 'column' }}>
 									{Array.from({ length: 4 }).map((_, i) => (
-										<div key={i} style={{
-											display: 'grid', gridTemplateColumns: '44px 64px 1.4fr 1fr 160px 110px 80px',
-											gap: 12, padding: '14px 22px', borderBottom: '1px solid var(--bf-line)', alignItems: 'center',
-										}}>
+										<div key={i} className='bf-admin-skeleton-row'>
 											<Skeleton h={16} w={16} r={4} />
 											<Skeleton h={44} w={44} r={8} />
 											<div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -1539,6 +1530,7 @@ export function AdminMenu() {
 											<Skeleton h={14} w={90} />
 											<Skeleton h={20} w={60} r={999} />
 											<div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+												<Skeleton h={28} w={28} r={999} />
 												<Skeleton h={28} w={28} r={999} />
 												<Skeleton h={28} w={28} r={999} />
 											</div>
@@ -1584,35 +1576,36 @@ export function AdminMenu() {
 									return (
 										<div
 											key={it.id}
-											style={{
-												display: 'grid', gridTemplateColumns: '44px 64px 1.4fr 1fr 160px 110px 80px',
-												gap: 12, padding: '12px 22px',
-												borderBottom: i < filteredProducts.length - 1 ? '1px solid var(--bf-line)' : 'none',
-												alignItems: 'center',
-											}}
+											className='bf-admin-product-row'
+											style={{ borderBottom: i < filteredProducts.length - 1 ? '1px solid var(--bf-line)' : 'none' }}
+											onClick={() => setModal(it)}
 										>
-											<input type='checkbox' style={{ width: 15, height: 15, accentColor: 'var(--bf-ink)', cursor: 'pointer' }} />
-											{it.imageUrl ? (
-												<img src={it.imageUrl} alt='' style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover' }} />
-											) : (
-												<FoodImg tone={TONES[i % TONES.length]} style={{ width: 44, height: 44 }} />
-											)}
-											<div>
+											<span className='bf-pmr-check'>
+												<input type='checkbox' style={{ width: 15, height: 15, accentColor: 'var(--bf-ink)', cursor: 'pointer' }} onClick={e => e.stopPropagation()} />
+											</span>
+											<span className='bf-pmr-img'>
+												{it.imageUrl ? (
+													<img src={it.imageUrl} alt='' style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', display: 'block' }} />
+												) : (
+													<FoodImg tone={TONES[i % TONES.length]} style={{ width: 44, height: 44 }} />
+												)}
+											</span>
+											<div className='bf-pmr-name'>
 												<div style={{ font: '700 14px var(--bf-font)' }}>{it.name}</div>
-												<div className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)', marginTop: 2, display: 'flex', gap: 6 }}>
+												<div className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)', marginTop: 2, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
 													<span>ID-{it.id}</span>
 													{it.isHot && <span style={{ color: 'var(--bf-ember)' }}>🌶 HOT</span>}
 													{hasDis && <span style={{ color: '#15803d' }}>● DISC</span>}
 													{it.hasSizes && <span style={{ color: 'var(--bf-ink-2)' }}>SIZES</span>}
 												</div>
 											</div>
-											<div>
+											<div className='bf-pmr-cat'>
 												<div style={{ fontSize: 13, color: 'var(--bf-ink-2)' }}>{it.category}</div>
 												{it.subCategoryName && (
 													<div style={{ fontSize: 10, color: 'var(--bf-mute)', marginTop: 2, fontWeight: 600 }}>{it.subCategoryName}</div>
 												)}
 											</div>
-											<div>
+											<div className='bf-pmr-price'>
 												<div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
 													{hasDis && (
 														<span className='bf-mono' style={{ fontSize: 10, color: 'var(--bf-mute)', textDecoration: 'line-through' }}>
@@ -1630,7 +1623,7 @@ export function AdminMenu() {
 													</span>
 												)}
 											</div>
-											<span>
+											<span className='bf-pmr-status'>
 												{it.isAvailable ? (
 													<span className='bf-pill' style={{ background: '#DCFCE7', color: '#166534', boxShadow: 'none' }}>
 														<span className='bf-dot bf-dot-ready' /> LIVE
@@ -1639,24 +1632,24 @@ export function AdminMenu() {
 													<span className='bf-pill' style={{ background: '#F1ECE3', color: 'var(--bf-mute)', boxShadow: 'none' }}>OFF</span>
 												)}
 											</span>
-											<div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+											<div className='bf-pmr-actions' style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
 												<button
 													className='bf-btn bf-btn-ghost bf-btn-icon'
 													style={{ width: 28, height: 28 }}
 													title='Edit'
-													onClick={() => setModal(it)}
+													onClick={e => { e.stopPropagation(); setModal(it) }}
 												>{Icons.edit}</button>
 												<button
 													className='bf-btn bf-btn-ghost bf-btn-icon'
 													style={{ width: 28, height: 28, color: 'var(--bf-ink-2)' }}
 													title='Duplicate'
-													onClick={() => { setDupeSource(it); setModal('add') }}
+													onClick={e => { e.stopPropagation(); setDupeSource(it); setModal('add') }}
 												>{Icons.copy}</button>
 												<button
 													className='bf-btn bf-btn-ghost bf-btn-icon'
 													style={{ width: 28, height: 28, color: 'var(--bf-ember)' }}
 													title='Delete'
-													onClick={() => setDeleteId(it.id)}
+													onClick={e => { e.stopPropagation(); setDeleteId(it.id) }}
 												>{Icons.trash}</button>
 											</div>
 										</div>
