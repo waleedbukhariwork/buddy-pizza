@@ -2316,35 +2316,183 @@ div.bf-search-result {
 	align-items: stretch;
 }
 
+/* ─── Footer — trust band ─────────────────────────────────────────────────── */
 .bf-footer-trust {
 	padding: 40px 56px;
 	background: var(--bf-ink);
 	color: #fff;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.bf-footer-trust-grid {
+.bf-footer-trust-inner {
 	display: grid;
 	grid-template-columns: repeat(4, 1fr);
-	gap: 24px;
+	gap: 28px;
 	max-width: 1280px;
 	margin: 0 auto;
 }
 
-.bf-footer-bar {
-	padding: 32px 56px;
+.bf-trust-item {
 	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	background: var(--bf-cream-2);
-	flex-wrap: wrap;
-	gap: 16px;
+	align-items: flex-start;
+	gap: 14px;
 }
 
-.bf-footer-links {
+.bf-trust-icon {
+	width: 40px;
+	min-width: 40px;
+	height: 40px;
+	background: rgba(255, 182, 39, 0.12);
+	border-radius: 10px;
 	display: flex;
-	gap: 24px;
-	font: 500 13px var(--bf-font);
-	color: var(--bf-ink-2);
+	align-items: center;
+	justify-content: center;
+	color: var(--bf-amber);
+}
+
+.bf-trust-key {
+	font-weight: 800;
+	font-size: 14px;
+	color: #fff;
+	letter-spacing: -0.01em;
+	line-height: 1.3;
+}
+
+.bf-trust-val {
+	font-size: 13px;
+	color: rgba(255, 255, 255, 0.5);
+	margin-top: 4px;
+	line-height: 1.5;
+}
+
+/* ─── Footer — main ───────────────────────────────────────────────────────── */
+.bf-footer-main {
+	background: #1c1819;
+	padding: 56px 56px 0;
+	color: #fff;
+}
+
+.bf-footer-inner {
+	display: grid;
+	grid-template-columns: 2fr 1fr 1fr 1fr;
+	gap: 48px;
+	max-width: 1280px;
+	margin: 0 auto;
+	padding-bottom: 48px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.bf-footer-tagline {
+	font-size: 13.5px;
+	color: rgba(255, 255, 255, 0.45);
+	line-height: 1.65;
+	margin: 16px 0 24px;
+	max-width: 260px;
+}
+
+.bf-footer-social {
+	display: flex;
+	gap: 10px;
+}
+
+.bf-social-btn {
+	width: 36px;
+	height: 36px;
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.07);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: rgba(255, 255, 255, 0.6);
+	text-decoration: none;
+	transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.bf-social-btn:hover {
+	background: rgba(255, 255, 255, 0.14);
+	color: #fff;
+	border-color: rgba(255, 255, 255, 0.2);
+}
+
+.bf-footer-col-head {
+	font-size: 10.5px;
+	font-weight: 700;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: var(--bf-amber);
+	margin: 0 0 18px;
+	font-family: var(--bf-mono);
+}
+
+.bf-footer-col-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 11px;
+}
+
+.bf-footer-col-list a {
+	font-size: 13.5px;
+	font-weight: 500;
+	color: rgba(255, 255, 255, 0.5);
+	text-decoration: none;
+	transition: color 0.15s;
+	display: block;
+}
+.bf-footer-col-list a:hover {
+	color: #fff;
+}
+
+.bf-footer-info-row {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	font-size: 13.5px;
+	font-weight: 500;
+	color: rgba(255, 255, 255, 0.5);
+}
+.bf-footer-info-row svg {
+	flex-shrink: 0;
+	opacity: 0.55;
+}
+
+.bf-footer-bottom {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 20px 0;
+	max-width: 1280px;
+	margin: 0 auto;
+}
+
+.bf-footer-copy {
+	font-family: var(--bf-mono);
+	font-size: 11px;
+	color: rgba(255, 255, 255, 0.3);
+	letter-spacing: 0.04em;
+}
+
+.bf-footer-bottom-links {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	font: 500 12px var(--bf-font);
+}
+
+.bf-footer-bottom-links a {
+	color: rgba(255, 255, 255, 0.3);
+	text-decoration: none;
+	transition: color 0.15s;
+}
+.bf-footer-bottom-links a:hover {
+	color: rgba(255, 255, 255, 0.7);
+}
+
+.bf-footer-sep {
+	color: rgba(255, 255, 255, 0.15);
+	font-size: 12px;
 }
 
 /* Responsive */
@@ -2382,8 +2530,12 @@ div.bf-search-result {
 	.bf-page-main,
 	.bf-hero,
 	.bf-menu-cat-strip-inner,
-	.bf-footer-trust,
-	.bf-footer-bar {
+	.bf-footer-trust {
+		padding-left: 20px;
+		padding-right: 20px;
+	}
+
+	.bf-footer-main {
 		padding-left: 20px;
 		padding-right: 20px;
 	}
@@ -2427,9 +2579,33 @@ div.bf-search-result {
 		white-space: normal;
 	}
 
-	.bf-footer-trust-grid {
+	.bf-footer-trust-inner {
 		grid-template-columns: 1fr 1fr;
 		gap: 20px;
+	}
+
+	.bf-footer-inner {
+		grid-template-columns: 1fr 1fr;
+		gap: 32px;
+	}
+
+	.bf-footer-brand {
+		grid-column: 1 / -1;
+	}
+
+	.bf-footer-tagline {
+		max-width: 100%;
+	}
+
+	.bf-footer-bottom {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 10px;
+		padding-bottom: calc(20px + 60px + env(safe-area-inset-bottom));
+	}
+
+	.bf-footer-main {
+		padding-top: 40px;
 	}
 
 	.bf-delivery-eta {
@@ -2451,8 +2627,12 @@ div.bf-search-result {
 	.bf-page-main,
 	.bf-hero,
 	.bf-menu-cat-strip-inner,
-	.bf-footer-trust,
-	.bf-footer-bar {
+	.bf-footer-trust {
+		padding-left: 32px;
+		padding-right: 32px;
+	}
+
+	.bf-footer-main {
 		padding-left: 32px;
 		padding-right: 32px;
 	}
@@ -2477,9 +2657,23 @@ div.bf-search-result {
 		grid-template-columns: repeat(2, 1fr);
 	}
 
-	/* Footer trust: keep 2 col for better readability */
-	.bf-footer-trust-grid {
+	/* Footer trust: 2 col at tablet */
+	.bf-footer-trust-inner {
 		grid-template-columns: repeat(2, 1fr);
+	}
+
+	/* Footer main: brand spans full width, links in 3 columns */
+	.bf-footer-inner {
+		grid-template-columns: 1fr 1fr 1fr;
+		gap: 32px;
+	}
+
+	.bf-footer-brand {
+		grid-column: 1 / -1;
+	}
+
+	.bf-footer-tagline {
+		max-width: 480px;
 	}
 
 	/* Deals home: 2 col */
@@ -2595,18 +2789,6 @@ div.bf-search-result {
 	}
 }
 
-/* ─── Footer bar wrapping on mobile ──────────────────────────────────────────── */
-@media (max-width: 767px) {
-	.bf-footer-bar {
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 12px;
-		padding: 24px 20px;
-	}
-	.bf-footer-links {
-		gap: 16px;
-	}
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════════
    WOW EXPERIENCE ENHANCEMENTS — Home page

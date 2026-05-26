@@ -220,19 +220,7 @@ function HeroV3() {
 				</div>
 			</div>
 
-			{/* Amber marquee bridge — dark → cream */}
-			<div className='bf-menu-marquee' aria-hidden='true'>
-				<div className='bf-menu-marquee-track'>
-					<span>
-						PEPPERONI · BURGERS · SHAWARMA · CRISPY WINGS · LOADED FRIES ·
-						SUNDAES · WRAPS · FRESH SIDES ·{' '}
-					</span>
-					<span aria-hidden='true'>
-						PEPPERONI · BURGERS · SHAWARMA · CRISPY WINGS · LOADED FRIES ·
-						SUNDAES · WRAPS · FRESH SIDES ·{' '}
-					</span>
-				</div>
-			</div>
+
 		</section>
 	)
 }

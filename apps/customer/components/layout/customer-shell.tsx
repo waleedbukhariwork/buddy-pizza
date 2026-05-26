@@ -339,6 +339,175 @@ function BottomNav({
 	)
 }
 
+// ─── Site Footer ─────────────────────────────────────────────────────────────
+function SiteFooter() {
+	const trustItems = [
+		{
+			icon: (
+				<svg width={20} height={20} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={1.8} strokeLinecap='round' strokeLinejoin='round'>
+					<circle cx='12' cy='12' r='10' /><path d='M12 6v6l4 2' />
+				</svg>
+			),
+			k: '30-min delivery',
+			v: "Hot-out-of-oven, or it's on us.",
+		},
+		{
+			icon: (
+				<svg width={20} height={20} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={1.8} strokeLinecap='round' strokeLinejoin='round'>
+					<path d='M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z' /><polyline points='9 22 9 12 15 12 15 22' />
+				</svg>
+			),
+			k: 'One kitchen',
+			v: 'No marketplace. We cook, we deliver.',
+		},
+		{
+			icon: (
+				<svg width={20} height={20} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={1.8} strokeLinecap='round' strokeLinejoin='round'>
+					<rect x='2' y='5' width='20' height='14' rx='2' /><line x1='2' y1='10' x2='22' y2='10' />
+				</svg>
+			),
+			k: 'Cash on delivery',
+			v: 'Pay on arrival. No prepayment needed.',
+		},
+		{
+			icon: (
+				<svg width={20} height={20} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={1.8} strokeLinecap='round' strokeLinejoin='round'>
+					<path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' />
+				</svg>
+			),
+			k: 'Real photos',
+			v: 'What you see is exactly what arrives.',
+		},
+	]
+
+	const navCols = [
+		{
+			head: 'Order',
+			links: [
+				{ href: '/menu', label: 'Full Menu' },
+				{ href: '/deals', label: "Today's Deals" },
+				{ href: '/menu', label: 'Pizza' },
+				{ href: '/menu', label: 'Burgers' },
+			],
+		},
+		{
+			head: 'Account',
+			links: [
+				{ href: '/auth/login', label: 'Sign In' },
+				{ href: '/auth/register', label: 'Create Account' },
+				{ href: '/account/orders', label: 'My Orders' },
+				{ href: '/account/profile', label: 'Profile' },
+			],
+		},
+	]
+
+	return (
+		<>
+			{/* Trust band */}
+			<section className='bf-footer-trust'>
+				<div className='bf-footer-trust-inner'>
+					{trustItems.map((t) => (
+						<div key={t.k} className='bf-trust-item'>
+							<span className='bf-trust-icon'>{t.icon}</span>
+							<div>
+								<div className='bf-trust-key'>{t.k}</div>
+								<div className='bf-trust-val'>{t.v}</div>
+							</div>
+						</div>
+					))}
+				</div>
+			</section>
+
+			{/* Main footer */}
+			<footer className='bf-footer-main'>
+				<div className='bf-footer-inner'>
+					{/* Brand */}
+					<div className='bf-footer-brand'>
+						<Logo size={18} mono />
+						<p className='bf-footer-tagline'>
+							Pizza, burgers, shawarma &amp; more — made fresh in our kitchen and
+							delivered straight to your door.
+						</p>
+						<div className='bf-footer-social'>
+							<a
+								href='https://instagram.com'
+								aria-label='Instagram'
+								className='bf-social-btn'
+								target='_blank'
+								rel='noopener noreferrer'
+							>
+								<svg width={16} height={16} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={1.8} strokeLinecap='round' strokeLinejoin='round'>
+									<rect x='2' y='2' width='20' height='20' rx='5' />
+									<path d='M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z' />
+									<line x1='17.5' y1='6.5' x2='17.51' y2='6.5' />
+								</svg>
+							</a>
+							<a
+								href='https://facebook.com'
+								aria-label='Facebook'
+								className='bf-social-btn'
+								target='_blank'
+								rel='noopener noreferrer'
+							>
+								<svg width={16} height={16} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={1.8} strokeLinecap='round' strokeLinejoin='round'>
+									<path d='M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z' />
+								</svg>
+							</a>
+						</div>
+					</div>
+
+					{/* Nav columns */}
+					{navCols.map((col) => (
+						<div key={col.head} className='bf-footer-col'>
+							<h4 className='bf-footer-col-head'>{col.head}</h4>
+							<ul className='bf-footer-col-list'>
+								{col.links.map((l) => (
+									<li key={l.label}>
+										<Link href={l.href}>{l.label}</Link>
+									</li>
+								))}
+							</ul>
+						</div>
+					))}
+
+					{/* Info column */}
+					<div className='bf-footer-col'>
+						<h4 className='bf-footer-col-head'>Find Us</h4>
+						<ul className='bf-footer-col-list'>
+							<li>
+								<div className='bf-footer-info-row'>
+									<svg width={14} height={14} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
+										<path d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z' /><circle cx='12' cy='10' r='3' />
+									</svg>
+									Multan, Punjab, Pakistan
+								</div>
+							</li>
+							<li>
+								<div className='bf-footer-info-row'>
+									<svg width={14} height={14} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round'>
+										<circle cx='12' cy='12' r='10' /><polyline points='12 6 12 12 16 14' />
+									</svg>
+									Open 11 AM – 2 AM daily
+								</div>
+							</li>
+						</ul>
+					</div>
+				</div>
+
+				{/* Bottom bar */}
+				<div className='bf-footer-bottom'>
+					<span className='bf-footer-copy'>© 2026 BUDDY FEAST · MULTAN, PAKISTAN</span>
+					<div className='bf-footer-bottom-links'>
+						<Link href='/privacy'>Privacy</Link>
+						<span className='bf-footer-sep'>·</span>
+						<Link href='/terms'>Terms</Link>
+					</div>
+				</div>
+			</footer>
+		</>
+	)
+}
+
 function CartBar({ onOpen }: { onOpen: () => void }) {
 	const count = useCartStore((s) =>
 		s.items.reduce((acc, i) => acc + i.quantity, 0),
@@ -532,55 +701,7 @@ function ShellInner({
 			<CartBar onOpen={() => setCartOpen(true)} />
 			<BottomNav activePage={activePage} onCartOpen={() => setCartOpen(true)} />
 
-			<section className='bf-footer-trust'>
-				<div className='bf-footer-trust-grid'>
-					{[
-						{ k: '30 min', v: "Hot-out-of-oven delivery, or it's on us." },
-						{ k: 'One kitchen', v: 'No marketplace. We cook, we deliver.' },
-						{ k: 'COD', v: 'Pay cash on delivery. Card support coming soon.' },
-						{
-							k: 'Real photos',
-							v: 'What you see is what shows up at your door.',
-						},
-					].map((t, i) => (
-						<div key={i}>
-							<div
-								style={{
-									fontWeight: 800,
-									fontSize: 28,
-									color: 'var(--bf-amber)',
-									letterSpacing: '-0.022em',
-								}}
-							>
-								{t.k}
-							</div>
-							<div
-								style={{
-									fontSize: 14,
-									color: 'rgba(255,255,255,.7)',
-									marginTop: 6,
-								}}
-							>
-								{t.v}
-							</div>
-						</div>
-					))}
-				</div>
-			</section>
-			<footer className='bf-footer-bar'>
-				<Logo size={18} />
-				<div className='bf-footer-links'>
-					<span>About</span>
-					<span>Help</span>
-					<span>Privacy</span>
-				</div>
-				<div
-					className='bf-mono'
-					style={{ fontSize: 11, color: 'var(--bf-mute)' }}
-				>
-					© 2026 BUDDY FEAST · MULTAN
-				</div>
-			</footer>
+			<SiteFooter />
 		</div>
 	)
 }
