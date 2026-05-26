@@ -1,5 +1,6 @@
 'use client'
 import React, { useEffect, useRef } from 'react'
+import { SWRConfig } from 'swr'
 import { SearchProvider } from '../../lib/search-context'
 import { SearchOverlay } from '../search/search-overlay'
 import { useCartStore } from '../../lib/cart-store'
@@ -8,15 +9,29 @@ import { apiClient } from '../../lib/api-client'
 import type { CartItem } from '@shared/index'
 import type { ServerCartDTO } from '../../lib/hooks'
 
+const SWR_GLOBAL_CONFIG = {
+	revalidateOnFocus: false,
+	revalidateOnReconnect: false,
+	revalidateIfStale: false,
+	dedupingInterval: 60_000,
+	errorRetryCount: 3,
+	errorRetryInterval: 5_000,
+} as const
+
 // Retry with exponential backoff. Throws after all attempts exhausted.
-async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseMs = 1000): Promise<T> {
+async function withRetry<T>(
+	fn: () => Promise<T>,
+	attempts = 3,
+	baseMs = 1000,
+): Promise<T> {
 	let lastErr: unknown
 	for (let i = 0; i < attempts; i++) {
 		try {
 			return await fn()
 		} catch (err) {
 			lastErr = err
-			if (i < attempts - 1) await new Promise((r) => setTimeout(r, baseMs * 2 ** i))
+			if (i < attempts - 1)
+				await new Promise((r) => setTimeout(r, baseMs * 2 ** i))
 		}
 	}
 	throw lastErr
@@ -82,12 +97,12 @@ function CartSyncProvider({ children }: { children: React.ReactNode }) {
 
 function AppProviders({ children }: { children: React.ReactNode }) {
 	return (
-		<SearchProvider>
-			<CartSyncProvider>
-				{children}
-			</CartSyncProvider>
-			<SearchOverlay />
-		</SearchProvider>
+		<SWRConfig value={SWR_GLOBAL_CONFIG}>
+			<SearchProvider>
+				<CartSyncProvider>{children}</CartSyncProvider>
+				<SearchOverlay />
+			</SearchProvider>
+		</SWRConfig>
 	)
 }
 

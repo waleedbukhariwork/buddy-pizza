@@ -75,9 +75,17 @@ export interface Deal {
 function migrateChoices(raw: unknown): OptionChoice[] {
 	if (Array.isArray(raw)) {
 		if (raw.length === 0) return []
-		if (typeof raw[0] === 'string') return (raw as string[]).map(s => ({ label: s, priceAdjustment: 0 }))
-		if (typeof raw[0] === 'object' && raw[0] !== null && 'label' in (raw[0] as any)) {
-			return (raw as any[]).map(c => ({ label: c.label ?? '', priceAdjustment: c.priceAdjustment ?? 0 }))
+		if (typeof raw[0] === 'string')
+			return (raw as string[]).map((s) => ({ label: s, priceAdjustment: 0 }))
+		if (
+			typeof raw[0] === 'object' &&
+			raw[0] !== null &&
+			'label' in (raw[0] as any)
+		) {
+			return (raw as any[]).map((c) => ({
+				label: c.label ?? '',
+				priceAdjustment: c.priceAdjustment ?? 0,
+			}))
 		}
 	}
 	return []
@@ -93,12 +101,15 @@ export function parseDealItems(raw: string | null | undefined): DealItem[] {
 				name: item.name ?? '',
 				qty: item.qty ?? 1,
 				unitPrice: item.unitPrice ?? 0,
-				options: item.options?.length ? item.options.map((g: any) => ({
-					label: g.label ?? '',
-					type: g.type === 'multi' ? 'multi' : ('single' as 'single' | 'multi'),
-					required: !!g.required,
-					choices: migrateChoices(g.choices),
-				})) : undefined,
+				options: item.options?.length
+					? item.options.map((g: any) => ({
+							label: g.label ?? '',
+							type:
+								g.type === 'multi' ? 'multi' : ('single' as 'single' | 'multi'),
+							required: !!g.required,
+							choices: migrateChoices(g.choices),
+						}))
+					: undefined,
 				size: item.size ?? null,
 				availableFlavors: item.availableFlavors ?? undefined,
 			}))
@@ -106,13 +117,23 @@ export function parseDealItems(raw: string | null | undefined): DealItem[] {
 			// fall through to legacy format
 		}
 	}
-	return raw.split('\n').filter(Boolean).map(line => {
-		const m = line.match(/^(\d+)×\s*(.+)$/)
-		return { name: m ? m[2] : line, qty: m ? parseInt(m[1]) : 1, unitPrice: 0, availableFlavors: [] }
-	})
+	return raw
+		.split('\n')
+		.filter(Boolean)
+		.map((line) => {
+			const m = line.match(/^(\d+)×\s*(.+)$/)
+			return {
+				name: m ? m[2] : line,
+				qty: m ? parseInt(m[1]) : 1,
+				unitPrice: 0,
+				availableFlavors: [],
+			}
+		})
 }
 
-export function getDealExpiryBadge(expiresAt: string | null | undefined): { text: string; urgent: boolean } | null {
+export function getDealExpiryBadge(
+	expiresAt: string | null | undefined,
+): { text: string; urgent: boolean } | null {
 	if (!expiresAt) return null
 	const diff = new Date(expiresAt).getTime() - Date.now()
 	if (diff < 0) return null
@@ -120,7 +141,8 @@ export function getDealExpiryBadge(expiresAt: string | null | undefined): { text
 	if (hours < 2) return { text: 'Ending soon!', urgent: true }
 	if (hours < 24) return { text: `Ends in ${hours}h`, urgent: true }
 	const days = Math.floor(hours / 24)
-	if (days <= 7) return { text: `Ends in ${days} day${days > 1 ? 's' : ''}`, urgent: false }
+	if (days <= 7)
+		return { text: `Ends in ${days} day${days > 1 ? 's' : ''}`, urgent: false }
 	return null
 }
 
@@ -165,8 +187,17 @@ export function useProducts() {
 	return useSWR<Product[]>('/v1/products', fetcher)
 }
 
-export function useProductSearch(q: string, categoryId: number | null, page: number, size = 12) {
-	const params = new URLSearchParams({ q, page: String(page), size: String(size) })
+export function useProductSearch(
+	q: string,
+	categoryId: number | null,
+	page: number,
+	size = 12,
+) {
+	const params = new URLSearchParams({
+		q,
+		page: String(page),
+		size: String(size),
+	})
 	if (categoryId !== null) params.set('categoryId', String(categoryId))
 	const key = q.trim().length > 0 ? `/v1/products/search?${params}` : null
 	return useSWR<PageResponse<Product>>(key, fetcher)
@@ -181,7 +212,10 @@ export function useDeals() {
 }
 
 export function useMyOrders(enabled = true) {
-	return useSWR<Order[]>(enabled ? '/v1/orders' : null, fetcher)
+	return useSWR<Order[]>(enabled ? '/v1/orders' : null, fetcher, {
+		revalidateOnFocus: true,
+		dedupingInterval: 30_000,
+	})
 }
 
 export function useMyProfile(enabled = true) {
@@ -189,12 +223,19 @@ export function useMyProfile(enabled = true) {
 }
 
 // ─── Profile mutations ────────────────────────────────────────────────────────
-export async function updateProfile(data: { name?: string; email?: string; address?: string }): Promise<User> {
+export async function updateProfile(data: {
+	name?: string
+	email?: string
+	address?: string
+}): Promise<User> {
 	const res = await apiClient.put<User>('/v1/users/me', data)
 	return res.data
 }
 
-export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+export async function changePassword(
+	currentPassword: string,
+	newPassword: string,
+): Promise<void> {
 	await apiClient.put('/v1/users/me/password', { currentPassword, newPassword })
 }
 
@@ -210,7 +251,14 @@ export interface PlacedOrder {
 }
 
 export async function placeOrder(payload: {
-	items: Array<{ productId?: number; dealId?: number; itemName?: string; price?: number; quantity: number; customizations?: string }>
+	items: Array<{
+		productId?: number
+		dealId?: number
+		itemName?: string
+		price?: number
+		quantity: number
+		customizations?: string
+	}>
 	deliveryAddress: string
 	customerPhone: string
 	specialNotes?: string
@@ -229,13 +277,12 @@ export interface ServerCartDTO {
 }
 
 export function useServerCart() {
-	return useSWR<ServerCartDTO>('/v1/cart', fetcher, {
-		revalidateOnFocus: false,
-		revalidateOnReconnect: false,
-	})
+	return useSWR<ServerCartDTO>('/v1/cart', fetcher)
 }
 
-export async function syncCartToServer(items: CartItem[]): Promise<ServerCartDTO> {
+export async function syncCartToServer(
+	items: CartItem[],
+): Promise<ServerCartDTO> {
 	const { data } = await apiClient.put<ServerCartDTO>('/v1/cart', items)
 	return data
 }
@@ -256,7 +303,10 @@ export function timeAgo(dateStr: string): string {
 	if (mins < 60) return `${mins} min ago`
 	const hrs = Math.floor(mins / 60)
 	if (hrs < 24) return `${hrs}h ago`
-	return new Date(dateStr).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })
+	return new Date(dateStr).toLocaleDateString('en-PK', {
+		day: 'numeric',
+		month: 'short',
+	})
 }
 
 // ─── Promo code validation ────────────────────────────────────────────────────
@@ -266,7 +316,13 @@ export interface PromoResult {
 	message: string
 }
 
-export async function validatePromoCode(code: string, cartTotal: number): Promise<PromoResult> {
-	const { data } = await apiClient.post<PromoResult>('/v1/promo/validate', { code, cartTotal })
+export async function validatePromoCode(
+	code: string,
+	cartTotal: number,
+): Promise<PromoResult> {
+	const { data } = await apiClient.post<PromoResult>('/v1/promo/validate', {
+		code,
+		cartTotal,
+	})
 	return data
 }

@@ -90,22 +90,6 @@ function Confetti() {
 	)
 }
 
-// ─── Countdown timer ──────────────────────────────────────────────────────────
-function Countdown({ startSeconds = 32 * 60 }: { startSeconds?: number }) {
-	const [secs, setSecs] = useState(startSeconds)
-	useEffect(() => {
-		const id = setInterval(() => setSecs((s) => Math.max(0, s - 1)), 1000)
-		return () => clearInterval(id)
-	}, [])
-	const m = Math.floor(secs / 60)
-	const s = secs % 60
-	return (
-		<span style={{ fontFamily: 'var(--bf-mono)', fontWeight: 800, fontSize: 40, letterSpacing: '-0.02em', color: 'var(--bf-ember)' }}>
-			{m}:{String(s).padStart(2, '0')}
-		</span>
-	)
-}
-
 // ─── Order status → progress step ────────────────────────────────────────────
 const STATUS_STEP: Record<string, number> = {
 	NEW: 0,
@@ -237,19 +221,10 @@ function ConfirmationExperience() {
 				<div className='bf-confirmation-grid' style={{ display: 'grid', gap: 18, marginTop: 32 }}>
 					{/* ── Order + ETA card ── */}
 					<div className='bf-card bf-fade-up-1' style={{ padding: 22 }}>
-						<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-							<div>
-								<div className='bf-eyebrow'>ORDER</div>
-								<div style={{ fontWeight: 800, fontSize: 26, marginTop: 4 }}>
-									{order ? `#${order.orderNumber}` : '—'}
-								</div>
-							</div>
-							<div style={{ textAlign: 'right' }}>
-								<div className='bf-eyebrow'>ARRIVING IN</div>
-								<Countdown startSeconds={32 * 60} />
-								<div className='bf-mono' style={{ fontSize: 11, color: 'var(--bf-mute)', marginTop: 2 }}>
-									est. by {new Date(Date.now() + 32 * 60_000).toLocaleTimeString('en-PK', { hour: 'numeric', minute: '2-digit', hour12: true })}
-								</div>
+						<div>
+							<div className='bf-eyebrow'>ORDER</div>
+							<div style={{ fontWeight: 800, fontSize: 26, marginTop: 4 }}>
+								{order ? `#${order.orderNumber}` : '—'}
 							</div>
 						</div>
 						<hr className='bf-rule' />
