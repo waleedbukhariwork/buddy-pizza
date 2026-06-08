@@ -1,5 +1,6 @@
 .env.local
 .env.*.local
+/.env
 node_modules/
 
 # Environment files — never commit real env values, set via Render dashboard or copy locally
