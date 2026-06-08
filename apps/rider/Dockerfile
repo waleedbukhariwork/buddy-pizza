@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 ARG BACKEND_URL=http://localhost:8080
 ENV BACKEND_URL=$BACKEND_URL
 WORKDIR /app
@@ -11,7 +11,7 @@ RUN npm ci
 WORKDIR /app/apps/rider
 RUN npm run build
 
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

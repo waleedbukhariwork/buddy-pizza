@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 ARG NEXT_PUBLIC_API_URL=http://localhost:8080/api
 ARG BACKEND_URL=http://localhost:8080
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
@@ -13,7 +13,7 @@ RUN npm ci
 WORKDIR /app/apps/customer
 RUN npm run build
 
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
